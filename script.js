@@ -1,5 +1,5 @@
 // ============================================================================
-// ARCHIVO: script.js (VERSIÓN COMPLETA Y FINAL)
+// ARCHIVO: script.js (FINAL CON INTENSIFICACIÓN DOBLE)
 // ============================================================================
 
 // --- TU URL DE GOOGLE APPS SCRIPT ---
@@ -129,7 +129,7 @@ async function verEstudiantes() {
     }
 }
 
-// --- LÓGICA DE INSCRIPCIÓN (MATERIAS + INTENSIFICACIÓN) ---
+// --- LÓGICA DE INSCRIPCIÓN (MATERIAS + INTENSIFICACIÓN DOBLE) ---
 
 async function abrirModalInscripcion(index) {
     const est = baseDatosAlumnos[index]; 
@@ -157,7 +157,9 @@ async function abrirModalInscripcion(index) {
             opciones += `<option value="${m[1]}">${m[1]} (${m[3]})</option>`;
         });
 
-        // 2. Construir el Formulario (12 Materias + 4 Intensificaciones)
+        // 2. Construir el Formulario
+        
+        // PARTE A: 12 Materias Regulares (Simple)
         let htmlForm = `<h6 class="bg-light p-2 border border-start-0 border-end-0">Materias Regulares (Ciclo Lectivo)</h6>
                         <div class="row g-2 mb-3">`;
         
@@ -172,15 +174,20 @@ async function abrirModalInscripcion(index) {
                     </select>
                 </div>`;
         }
-        htmlForm += `</div>
-                     <h6 class="bg-warning bg-opacity-25 p-2 border border-start-0 border-end-0">Intensificaciones (Pendientes)</h6>
+        htmlForm += `</div>`;
+        
+        // PARTE B: 4 Intensificaciones (DOBLE ELECCIÓN: Qué debe -> Dónde rinde)
+        htmlForm += `<h6 class="bg-warning bg-opacity-25 p-2 border border-start-0 border-end-0">Intensificaciones (Previas/Pendientes)</h6>
+                     <div class="alert alert-warning py-1 px-2 small mb-2"><small>Selecciona: <b>Materia Adeudada</b> -> <b>En cuál intensifica</b></small></div>
                      <div class="row g-2">`;
         
         for(let j=1; j<=4; j++) {
             htmlForm += `
-                <div class="col-md-6 d-flex align-items-center mb-1">
+                <div class="col-12 d-flex align-items-center mb-1">
                     <span class="me-2 fw-bold text-muted small" style="width:20px">${j}.</span>
-                    <select id="intensificacion_${j}" class="form-select form-select-sm">${opciones}</select>
+                    <select id="int_adeuda_${j}" class="form-select form-select-sm me-1" title="Materia que intensifica (Adeudada)">${opciones}</select>
+                    <span class="small fw-bold text-muted mx-1">en</span>
+                    <select id="int_en_${j}" class="form-select form-select-sm" title="Materia donde intensifica">${opciones}</select>
                 </div>`;
         }
         htmlForm += `</div>`;
@@ -195,7 +202,7 @@ async function abrirModalInscripcion(index) {
             const data = jsonIns.data; 
             // data llega así: [DNI, Nombre, Mat1...Mat12, Int1...Int4]
             
-            // Llenar Materias (Indices 2 a 13)
+            // Llenar Materias Regulares (Indices 2 a 13)
             for(let i=1; i<=12; i++) {
                 const valor = data[i+1];
                 if(valor && valor.includes(' - ')) {
@@ -204,10 +211,16 @@ async function abrirModalInscripcion(index) {
                     document.getElementById(`estado_${i}`).value = partes[1];
                 }
             }
-            // Llenar Intensificaciones (Indices 14 a 17)
+            
+            // Llenar Intensificaciones Dobles (Indices 14 a 17)
             for(let j=1; j<=4; j++) {
                 const valor = data[13+j];
-                if(valor) document.getElementById(`intensificacion_${j}`).value = valor;
+                // El formato guardado es "Adeudada -> En"
+                if(valor && valor.includes(' -> ')) {
+                    const partes = valor.split(' -> ');
+                    document.getElementById(`int_adeuda_${j}`).value = partes[0];
+                    document.getElementById(`int_en_${j}`).value = partes[1];
+                }
             }
         }
 
@@ -227,16 +240,23 @@ async function guardarInscripcion() {
         nombre: document.getElementById('ins_nombre_est').value
     };
 
-    // Recolectar Materias
+    // Recolectar Materias (Formato: Materia - Estado)
     for(let i=1; i<=12; i++) {
         const mat = document.getElementById(`materia_${i}`).value;
         const est = document.getElementById(`estado_${i}`).value;
         datos[`m${i}`] = mat ? `${mat} - ${est}` : ""; 
     }
-    // Recolectar Intensificaciones
+    
+    // Recolectar Intensificaciones (Formato: Adeudada -> DondeRinde)
     for(let j=1; j<=4; j++) {
-        const int = document.getElementById(`intensificacion_${j}`).value;
-        datos[`i${j}`] = int || "";
+        const adeuda = document.getElementById(`int_adeuda_${j}`).value;
+        const en = document.getElementById(`int_en_${j}`).value;
+        
+        if(adeuda && en) {
+            datos[`i${j}`] = `${adeuda} -> ${en}`;
+        } else {
+            datos[`i${j}`] = "";
+        }
     }
 
     try {
@@ -276,7 +296,6 @@ function editarEstudiante(index) {
     document.getElementById('inp_tel').value = est[5];
     
     if(est[6]){
-        // Formatear fecha para el input type="date"
         document.getElementById('inp_nacimiento').value = new Date(est[6]).toISOString().split('T')[0];
     }
 
@@ -379,7 +398,7 @@ async function verDocentes() {
     }
 }
 
-// --- ASIGNACIÓN DE MATERIAS (CON ROJO PARA VACANTES) ---
+// --- ASIGNACIÓN DE MATERIAS ---
 
 async function abrirModalAsignacion(index) {
     const doc = baseDatosDocentes[index];
@@ -399,7 +418,6 @@ async function abrirModalAsignacion(index) {
         let opts = `<option value="" selected disabled>Selecciona la materia...</option>`;
         
         json.data.forEach(mat => {
-            // [0]ID, [1]Nombre, [2]DNI_Prof, [3]Curso, [4]Nombre_Prof
             const nombreProfe = mat[4] ? mat[4].toString().trim() : "";
             const tieneProfe = nombreProfe !== "";
             
@@ -608,7 +626,8 @@ function renderModalInscripcionHTML() {
           <div class="modal-body">
             <input type="hidden" id="ins_dni_est">
             <input type="hidden" id="ins_nombre_est">
-            <div id="gridMaterias"></div> </div>
+            <div id="gridMaterias"></div> 
+          </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
             <button type="button" class="btn btn-success" id="btnGuardarIns" onclick="guardarInscripcion()">Guardar Cambios</button>
