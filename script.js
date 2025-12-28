@@ -1,4 +1,4 @@
-// ARCHIVO: script.js (CRUD Completo + Asignación Materias)
+// ARCHIVO: script.js (Asignación con VACANTES EN ROJO)
 
 // ----------------------------------------------------
 const URL_API = "https://script.google.com/macros/s/AKfycbyTGnoS8hevr6k7pXE16p7KtcQxYrYP0yc11yJoJyvfX8Z7pEKJ5ZYymJ--IBcoVqUB/exec"; 
@@ -92,7 +92,6 @@ async function verDocentes() {
                     <tbody>`;
         
         json.data.forEach((fila, index) => {
-            // fila = [DNI, Nombre, Email, Celular]
             html += `
                 <tr>
                     <td>${fila[0]}</td>
@@ -107,23 +106,21 @@ async function verDocentes() {
         });
         html += `</tbody></table></div>`;
         html += renderModalDocenteHTML(); 
-        html += renderModalAsignacionHTML(); // Nuevo modal
+        html += renderModalAsignacionHTML(); 
         document.getElementById('contenido-dinamico').innerHTML = html;
     } catch (e) {
         alert("Error cargando docentes.");
     }
 }
 
-// --- LOGICA DE ASIGNACIÓN (NUEVO) ---
+// --- LOGICA DE ASIGNACIÓN (AQUÍ ESTÁ EL CAMBIO DE COLOR) ---
 
 async function abrirModalAsignacion(index) {
     const doc = baseDatosDocentes[index];
-    // Guardamos datos del docente en campos ocultos o variables
     document.getElementById('asig_dni_docente').value = doc[0];
     document.getElementById('asig_nombre_docente').value = doc[1];
     document.getElementById('span_nombre_docente').innerText = doc[1];
 
-    // Cargar materias disponibles
     const select = document.getElementById('sel_materia_asig');
     select.innerHTML = '<option>Cargando materias...</option>';
     
@@ -134,11 +131,27 @@ async function abrirModalAsignacion(index) {
         const resp = await fetch(`${URL_API}?op=getMaterias&rol=Directivo`);
         const json = await resp.json();
         
-        let opts = `<option value="" selected disabled>Selecciona la materia y curso</option>`;
-        // Asumimos orden materias: [0]ID, [1]Nombre, [2]DNI_Prof, [3]Curso, [4]Nombre_Prof
+        let opts = `<option value="" selected disabled>Selecciona la materia...</option>`;
+        
+        // RECORREMOS LAS MATERIAS
         json.data.forEach(mat => {
-            const profeActual = mat[4] ? `(Prof: ${mat[4]})` : '(Vacante)';
-            opts += `<option value="${mat[0]}">${mat[1]} - ${mat[3]} ${profeActual}</option>`;
+            // mat[4] es el Nombre del Profesor
+            const tieneProfe = mat[4] && mat[4].toString().trim() !== "";
+            
+            let textoOpcion = "";
+            let estiloOpcion = "";
+
+            if (tieneProfe) {
+                // Si tiene profe, se ve normal
+                textoOpcion = `${mat[1]} (${mat[3]}) - Prof: ${mat[4]}`;
+                estiloOpcion = `style="color: black;"`;
+            } else {
+                // SI ESTÁ VACANTE: ROJO Y NEGRITA
+                textoOpcion = `[VACANTE] ${mat[1]} (${mat[3]})`;
+                estiloOpcion = `style="color: red; font-weight: bold;"`;
+            }
+
+            opts += `<option value="${mat[0]}" ${estiloOpcion}>${textoOpcion}</option>`;
         });
         select.innerHTML = opts;
 
@@ -190,10 +203,10 @@ function renderModalAsignacionHTML() {
             <input type="hidden" id="asig_nombre_docente">
             
             <div class="mb-3">
-                <label>Lista de Materias (desde Excel)</label>
-                <select id="sel_materia_asig" class="form-select"></select>
+                <label>Lista de Materias</label>
+                <select id="sel_materia_asig" class="form-select" size="10"></select>
             </div>
-            <div class="alert alert-info small">Esto escribirá el DNI y Nombre del docente en la hoja 'Materias'.</div>
+            <div class="alert alert-info small">Las materias en <b>ROJO</b> no tienen docente asignado aún.</div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
