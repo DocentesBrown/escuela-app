@@ -1,7 +1,30 @@
-/* styles.css */
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+/* Pega esto en styles.css para darle magia */
+
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.08);
 }
-.d-none {
-    display: none !important;
+
+.btn-primary {
+    background: linear-gradient(45deg, #007bff, #0056b3);
+    border: none;
+    padding: 10px 20px;
+}
+
+table {
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+thead {
+    background-color: #343a40;
+    color: white;
+}
+
+/* Esto hace que en el celular las letras no se vean gigantes */
+@media (max-width: 768px) {
+    .container { padding: 10px; }
+    h3 { font-size: 1.5rem; }
 }
