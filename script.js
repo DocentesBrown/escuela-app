@@ -1,23 +1,20 @@
-// ARCHIVO COMPLETO: script.js
-// (Reemplaza todo el contenido anterior con esto)
+// ARCHIVO: script.js (Con Filtro Inteligente)
 
-// ------------------------------------------------------------------
-// PEGA AQUI ABAJO TU URL DE GOOGLE (La que termina en /exec)
+// ----------------------------------------------------
 const URL_API = "https://script.google.com/macros/s/AKfycbyTGnoS8hevr6k7pXE16p7KtcQxYrYP0yc11yJoJyvfX8Z7pEKJ5ZYymJ--IBcoVqUB/exec"; 
-// ------------------------------------------------------------------
+// ----------------------------------------------------
 
-let usuarioActual = null; 
+let usuarioActual = null;
+let baseDatosAlumnos = []; // Aquí guardaremos todo para que sea rápido
 
 // --- LOGIN ---
 async function iniciarSesion() {
     const email = document.getElementById('email').value;
     const clave = document.getElementById('clave').value;
     const btn = document.getElementById('btn-login');
-    const errorMsg = document.getElementById('error-msg');
     
     btn.innerText = "Verificando...";
     btn.disabled = true;
-    errorMsg.classList.add('d-none');
 
     try {
         const resp = await fetch(`${URL_API}?op=login&email=${email}&pass=${clave}`);
@@ -27,20 +24,16 @@ async function iniciarSesion() {
             usuarioActual = data;
             cargarDashboard(data);
         } else {
-            errorMsg.innerText = data.message;
-            errorMsg.classList.remove('d-none');
+            alert(data.message);
         }
     } catch (e) {
-        console.error(e);
-        errorMsg.innerText = "Error de conexión. Revisa tu internet o la URL.";
-        errorMsg.classList.remove('d-none');
+        alert("Error de conexión");
     } finally {
         btn.innerText = "Ingresar";
         btn.disabled = false;
     }
 }
 
-// --- MENU PRINCIPAL ---
 function cargarDashboard(user) {
     document.getElementById('login-screen').classList.add('d-none');
     document.getElementById('dashboard-screen').classList.remove('d-none');
@@ -49,220 +42,144 @@ function cargarDashboard(user) {
     const menu = document.getElementById('menu-lateral');
     menu.innerHTML = '';
 
-    // OPCIONES DIRECTIVO
-    if (user.rol === 'Directivo') {
-        menu.innerHTML += `<button class="list-group-item list-group-item-action" onclick="verEstudiantes()">Gestionar Estudiantes</button>`;
-        menu.innerHTML += `<button class="list-group-item list-group-item-action" onclick="verDocentes()">Gestionar Docentes</button>`;
-    }
-    
-    // OPCIONES PRECEPTOR (NUEVO)
     if (user.rol === 'Preceptor') {
-        menu.innerHTML += `<button class="list-group-item list-group-item-action active" onclick="mostrarFormAsistencia()">📅 Tomar Asistencia</button>`;
-    }
-
-    // OPCIONES DOCENTE
-    if (user.rol === 'Docente') {
-        menu.innerHTML += `<button class="list-group-item list-group-item-action" onclick="mostrarCargaNotas()">Cargar Notas</button>`;
+        // Al entrar como preceptor, descargamos los datos YA MISMO
+        iniciarModuloPreceptor();
     }
     
-    // BOTON SALIR
-    menu.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Cerrar Sesión</button>`;
-
-    // Cargar la primera pantalla por defecto
-    if (user.rol === 'Preceptor') mostrarFormAsistencia();
+    menu.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Salir</button>`;
 }
 
 // ==========================================
-// MÓDULO PRECEPTORES (ASISTENCIA)
+// MÓDULO PRECEPTORES INTELIGENTE
 // ==========================================
 
-function mostrarFormAsistencia() {
-    const html = `
-        <div class="card p-4 shadow-sm">
-            <h4 class="mb-3">Registro de Asistencia Diaria</h4>
-            <div class="row g-2">
-                <div class="col-md-8">
-                    <select id="selector-curso" class="form-select form-select-lg">
-                        <option value="" selected disabled>Selecciona el Curso</option>
-                        <option value="1A">1° Año A</option>
-                        <option value="1B">1° Año B</option>
-                        <option value="2A">2° Año A</option>
-                        <option value="2B">2° Año B</option>
-                        <option value="3A">3° Año A</option>
-                        <option value="3B">3° Año B</option>
-                        </select>
-                </div>
-                <div class="col-md-4">
-                    <button onclick="cargarPlanillaCurso()" class="btn btn-primary btn-lg w-100">Cargar Alumnos</button>
-                </div>
-            </div>
+async function iniciarModuloPreceptor() {
+    // Mostramos mensaje de carga inicial
+    document.getElementById('contenido-dinamico').innerHTML = `
+        <div class="alert alert-info text-center">
+            <div class="spinner-border spinner-border-sm"></div> 
+            Descargando base de datos de estudiantes... Por favor espera.
         </div>
-        <div id="zona-planilla" class="mt-4"></div>
     `;
-    document.getElementById('contenido-dinamico').innerHTML = html;
-    document.getElementById('titulo-seccion').innerText = "Panel de Preceptoría";
-}
-
-async function cargarPlanillaCurso() {
-    const curso = document.getElementById('selector-curso').value;
-    if (!curso) return alert("Por favor selecciona un curso primero.");
-
-    mostrarCargando(`Buscando listado de ${curso}...`);
 
     try {
-        const resp = await fetch(`${URL_API}?op=getAlumnosCurso&rol=Preceptor&curso=${curso}`);
+        // Pedimos TODOS los estudiantes de una sola vez
+        const resp = await fetch(`${URL_API}?op=getDataPreceptor&rol=Preceptor`);
         const json = await resp.json();
+        
+        // Guardamos en memoria
+        baseDatosAlumnos = json.data; 
+        
+        // Ahora dibujamos la pantalla
+        renderizarPantallaPreceptor();
 
-        if (json.data.length === 0) {
-            document.getElementById('zona-planilla').innerHTML = 
-                `<div class="alert alert-warning text-center">⚠️ No hay alumnos registrados en el curso <b>${curso}</b>.<br>Revisa la hoja 'Estudiantes' en el Excel.</div>`;
-            return;
-        }
-
-        renderizarTablaAsistencia(json.data);
     } catch (e) {
-        console.error(e);
-        document.getElementById('zona-planilla').innerHTML = `<div class="alert alert-danger">Error de conexión con Google.</div>`;
+        document.getElementById('contenido-dinamico').innerHTML = `<div class="alert alert-danger">Error al descargar datos. Recarga la página.</div>`;
     }
 }
 
-function renderizarTablaAsistencia(alumnos) {
+function renderizarPantallaPreceptor() {
+    // 1. Analizar cursos disponibles automáticamente
+    // La columna Curso es la [2] en el Excel (0=DNI, 1=Nombre, 2=Curso)
+    const todosLosCursos = baseDatosAlumnos.map(fila => fila[2]);
+    
+    // Eliminar duplicados y ordenar (Set crea lista de unicos)
+    const cursosUnicos = [...new Set(todosLosCursos)].sort();
+
+    // 2. Crear las opciones del Select HTML
+    let opcionesHTML = `<option value="" selected disabled>Selecciona un Curso</option>`;
+    cursosUnicos.forEach(curso => {
+        if(curso) { // Solo si no está vacío
+            opcionesHTML += `<option value="${curso}">${curso}</option>`;
+        }
+    });
+
+    const html = `
+        <div class="card p-3 mb-3 shadow-sm">
+            <h5>📅 Tomar Asistencia</h5>
+            <div class="mb-2 text-muted small">Cursos detectados automáticamente desde el Excel</div>
+            <select id="selector-curso" class="form-select form-select-lg" onchange="filtrarYMostrar()">
+                ${opcionesHTML}
+            </select>
+        </div>
+        <div id="zona-planilla"></div>
+    `;
+    document.getElementById('contenido-dinamico').innerHTML = html;
+}
+
+function filtrarYMostrar() {
+    const cursoSeleccionado = document.getElementById('selector-curso').value;
+    
+    // FILTRO LOCAL (Instantáneo, no usa internet)
+    const alumnosDelCurso = baseDatosAlumnos.filter(fila => String(fila[2]) === cursoSeleccionado);
+    
+    // Ordenar por nombre
+    alumnosDelCurso.sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+
+    renderizarTabla(alumnosDelCurso);
+}
+
+function renderizarTabla(lista) {
+    if (lista.length === 0) return;
+
     let html = `
         <form id="form-asistencia">
-        <div class="card shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th style="width: 50%">Estudiante</th>
-                            <th class="text-center">Presente</th>
-                            <th class="text-center">Ausente</th>
-                            <th class="text-center">Tarde</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+        <div class="table-responsive bg-white rounded shadow-sm">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Estudiante</th>
+                        <th class="text-center">P</th>
+                        <th class="text-center">A</th>
+                        <th class="text-center">T</th>
+                    </tr>
+                </thead>
+                <tbody>
     `;
 
-    alumnos.forEach(alumno => {
-        // En Apps Script definimos: index 0=DNI, index 1=Nombre
-        const dni = alumno[0]; 
+    lista.forEach(alumno => {
+        const dni = alumno[0];
         const nombre = alumno[1];
-
+        
         html += `
             <tr>
-                <td class="fw-bold text-secondary">${nombre}</td>
-                <td class="text-center bg-light">
-                    <input class="form-check-input" type="radio" name="estado_${dni}" value="P" checked style="transform: scale(1.3);">
-                </td>
-                <td class="text-center">
-                    <input class="form-check-input" type="radio" name="estado_${dni}" value="A" style="transform: scale(1.3);">
-                </td>
-                <td class="text-center">
-                    <input class="form-check-input" type="radio" name="estado_${dni}" value="T" style="transform: scale(1.3);">
-                </td>
+                <td class="fw-bold">${nombre}</td>
+                <td class="text-center"><input type="radio" class="form-check-input" name="estado_${dni}" value="P" checked></td>
+                <td class="text-center"><input type="radio" class="form-check-input" name="estado_${dni}" value="A"></td>
+                <td class="text-center"><input type="radio" class="form-check-input" name="estado_${dni}" value="T"></td>
             </tr>
         `;
     });
 
-    html += `
-                    </tbody>
-                </table>
-            </div>
-            <div class="p-3 bg-light border-top">
-                <button type="button" onclick="guardarTodo()" class="btn btn-success w-100 btn-lg">✅ Guardar Asistencia</button>
-            </div>
-        </div>
-        </form>
-    `;
-
+    html += `</tbody></table></div>
+        <button type="button" onclick="guardarTodo()" class="btn btn-success w-100 mt-3 btn-lg">💾 Confirmar Asistencia</button>
+        </form>`;
+    
     document.getElementById('zona-planilla').innerHTML = html;
 }
 
 async function guardarTodo() {
-    const form = document.getElementById('form-asistencia');
-    const inputs = form.querySelectorAll('input[type="radio"]:checked');
-    const btnGuardar = form.querySelector('button');
-    
-    btnGuardar.disabled = true;
-    btnGuardar.innerText = "Guardando...";
+    const inputs = document.querySelectorAll('input[type="radio"]:checked');
+    let lista = [];
 
-    let listaAsistencia = [];
-
-    inputs.forEach(input => {
-        // name="estado_123456" -> split('_') -> ["estado", "123456"]
-        const dni = input.name.split('_')[1]; 
-        const estado = input.value;
-        listaAsistencia.push({ dni: dni, estado: estado });
+    inputs.forEach(inp => {
+        lista.push({ dni: inp.name.split('_')[1], estado: inp.value });
     });
 
-    const datos = {
-        op: 'guardarAsistenciaMasiva',
-        lista: listaAsistencia,
-        preceptor: usuarioActual.nombre
-    };
+    document.getElementById('zona-planilla').innerHTML = '<div class="alert alert-warning">Guardando en la nube...</div>';
 
-    await enviarDatos(datos);
-}
-
-// ==========================================
-// MÓDULO DIRECTIVO (Visualización)
-// ==========================================
-
-async function verEstudiantes() {
-    mostrarCargando("Descargando base de datos...");
-    const resp = await fetch(`${URL_API}?op=getEstudiantes&rol=Directivo`);
-    const json = await resp.json();
-    
-    let html = `<h5>Listado General</h5><table class="table table-bordered table-striped bg-white">
-                <thead class="table-dark"><tr><th>DNI</th><th>Nombre</th><th>Curso</th></tr></thead><tbody>`;
-    
-    json.data.forEach(fila => {
-        html += `<tr><td>${fila[0]}</td><td>${fila[1]}</td><td>${fila[2]}</td></tr>`;
+    await fetch(URL_API, {
+        method: 'POST',
+        body: JSON.stringify({
+            op: 'guardarAsistenciaMasiva',
+            lista: lista,
+            preceptor: usuarioActual.nombre
+        })
     });
-    html += `</tbody></table>`;
-    document.getElementById('contenido-dinamico').innerHTML = html;
+
+    alert("¡Asistencia guardada!");
+    // Limpiamos selección para evitar doble carga
+    document.getElementById('selector-curso').value = "";
+    document.getElementById('zona-planilla').innerHTML = "";
 }
-
-async function verDocentes() {
-    mostrarCargando("Cargando docentes...");
-    alert("Función disponible próximamente"); // Simplificado por ahora
-    document.getElementById('contenido-dinamico').innerHTML = "";
-}
-
-// ==========================================
-// MÓDULO DOCENTE (Notas)
-// ==========================================
-
-function mostrarCargaNotas() {
-    // Reutilizamos el código anterior, o lo dejamos pendiente si hoy solo hacemos Preceptores
-    document.getElementById('contenido-dinamico').innerHTML = `<div class="alert alert-info">Módulo de notas en construcción.</div>`;
-}
-
-// ==========================================
-// HERRAMIENTAS GENERALES
-// ==========================================
-
-async function enviarDatos(objetoDatos) {
-    try {
-        await fetch(URL_API, {
-            method: 'POST',
-            body: JSON.stringify(objetoDatos)
-        });
-        alert("¡Datos guardados con éxito!");
-        // Limpiamos la pantalla
-        document.getElementById('zona-planilla').innerHTML = '<div class="alert alert-success mt-3">Planilla guardada correctamente.</div>';
-    } catch (e) {
-        console.error(e);
-        alert("Hubo un error al guardar. Intenta de nuevo.");
-    }
-}
-
-function mostrarCargando(texto) {
-    document.getElementById('contenido-dinamico').innerHTML = `
-        <div class="d-flex justify-content-center align-items-center" style="height: 200px;">
-            <div class="spinner-border text-primary me-3" role="status"></div>
-            <span class="h5 text-muted">${texto}</span>
-        </div>
-    `;
-}
-
