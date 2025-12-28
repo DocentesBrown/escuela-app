@@ -265,3 +265,4 @@ function mostrarCargando(texto) {
         </div>
     `;
 }
+
