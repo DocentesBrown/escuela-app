@@ -1,25 +1,25 @@
 // ============================================================================
-// ARCHIVO: script.js (VERSIÓN COMPLETA ORIGINAL + FIX JUSTIFICACIÓN)
-// NO SE ELIMINÓ NINGUNA FUNCIÓN EXISTENTE
+// ARCHIVO: script.js (PRECEPTOR POWERED + MODULOS ANTERIORES)
 // ============================================================================
 
-const URL_API = "https://script.google.com/macros/s/AKfycbyTGnoS8hevr6k7pXE16p7KtcQxYrYP0yc11yJoJyvfX8Z7pEKJ5ZYymJ--IBcoVqUB/exec";
+// --- TU URL DE GOOGLE APPS SCRIPT ---
+const URL_API = "https://script.google.com/macros/s/AKfycbyTGnoS8hevr6k7pXE16p7KtcQxYrYP0yc11yJoJyvfX8Z7pEKJ5ZYymJ--IBcoVqUB/exec"; 
 
 // --- VARIABLES GLOBALES ---
 let usuarioActual = null;
-let baseDatosAlumnos = [];
-let baseDatosDocentes = [];
+let baseDatosAlumnos = []; 
+let baseDatosDocentes = []; 
 
-// ============================================================================
-// 1. LOGIN Y DASHBOARD (SIN CAMBIOS)
-// ============================================================================
+// ==========================================
+// 1. SISTEMA DE LOGIN Y DASHBOARD
+// ==========================================
 
 async function iniciarSesion() {
     const email = document.getElementById('email').value;
     const clave = document.getElementById('clave').value;
     const btn = document.getElementById('btn-login');
     const errorMsg = document.getElementById('error-msg');
-
+    
     btn.innerText = "Verificando...";
     btn.disabled = true;
     errorMsg.classList.add('d-none');
@@ -36,7 +36,8 @@ async function iniciarSesion() {
             errorMsg.classList.remove('d-none');
         }
     } catch (e) {
-        errorMsg.innerText = "Error de conexión.";
+        console.error(e);
+        errorMsg.innerText = "Error de conexión con el servidor.";
         errorMsg.classList.remove('d-none');
     } finally {
         btn.innerText = "Ingresar";
@@ -51,8 +52,9 @@ function cargarDashboard(user) {
 
     const menu = document.getElementById('menu-lateral');
     menu.innerHTML = '';
-    const rol = user.rol.toLowerCase();
+    const rol = String(user.rol).trim().toLowerCase(); 
 
+    // --- MENÚ DIRECTIVO ---
     if (rol === 'directivo') {
         menu.innerHTML += `
             <button class="list-group-item list-group-item-action" onclick="verEstudiantes()">👥 Gestión Estudiantes</button>
@@ -60,13 +62,13 @@ function cargarDashboard(user) {
         `;
     }
 
+    // --- MENÚ PRECEPTOR ---
     if (rol === 'preceptor') {
-        iniciarModuloPreceptor();
+        iniciarModuloPreceptor(); 
     }
 
-    menu.innerHTML += `
-        <button class="list-group-item list-group-item-action text-danger mt-3"
-                onclick="location.reload()">Cerrar Sesión</button>`;
+    // --- BOTÓN SALIR ---
+    menu.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Cerrar Sesión</button>`;
 }
 
 // ==========================================
@@ -449,18 +451,19 @@ async function borrarDocente(dni, email) {
 // ==========================================
 
 async function iniciarModuloPreceptor() {
-    document.getElementById('contenido-dinamico').innerHTML =
-        `<div class="spinner-border spinner-border-sm"></div> Cargando datos y estadísticas...`;
-
+    document.getElementById('contenido-dinamico').innerHTML = `<div class="spinner-border spinner-border-sm"></div> Cargando datos y estadísticas...`;
+    
     try {
+        // Obtenemos alumnos Y estadísticas de faltas
         const resp = await fetch(`${URL_API}?op=getDataPreceptor&rol=Preceptor`);
         const json = await resp.json();
-
-        baseDatosAlumnos = json.data;
-
+        // data ahora trae objetos { data: [ArrayAlumno], stats: { I:0, J:0, T:0, P:0, total: 0 } }
+        baseDatosAlumnos = json.data; 
+        
+        // Extraemos cursos únicos desde el objeto interno 'data' (índice 2 es Curso)
         const cursos = [...new Set(baseDatosAlumnos.map(obj => obj.data[2]))].sort();
         let opts = cursos.map(c => `<option value="${c}">${c}</option>`).join('');
-
+        
         document.getElementById('contenido-dinamico').innerHTML = `
             <div class="card p-3 shadow-sm mb-3">
                 <h5>📅 Control de Asistencia</h5>
@@ -470,174 +473,194 @@ async function iniciarModuloPreceptor() {
                 <div id="resumenClase" class="mt-2 text-muted small"></div>
             </div>
             <div id="zonaPreceptor"></div>
-        `;
-
-        // 🔧 FIX: el modal se crea UNA SOLA VEZ
-        if (!document.getElementById('modalJustificar')) {
-            document.body.insertAdjacentHTML('beforeend', renderModalJustificacionHTML());
-        }
-
-    } catch (e) {
-        console.error(e);
-        document.getElementById('contenido-dinamico').innerHTML =
-            `<div class="alert alert-danger">Error de conexión.</div>`;
+            ${renderModalJustificacionHTML()}
+            `;
+    } catch(e) {
+        console.log(e);
+        document.getElementById('contenido-dinamico').innerHTML = `<div class="alert alert-danger">Error de conexión.</div>`;
     }
 }
 
 function renderTablaPreceptor() {
     const curso = document.getElementById('selCurso').value;
-
+    // Filtramos y ordenamos por nombre
     const lista = baseDatosAlumnos
-        .filter(obj => String(obj.data[2]) === curso)
-        .sort((a, b) => String(a.data[1]).localeCompare(b.data[1]));
-
-    if (lista.length === 0) {
-        document.getElementById('zonaPreceptor').innerHTML =
-            '<div class="alert alert-warning">No hay alumnos en este curso.</div>';
+                    .filter(obj => String(obj.data[2]) === curso)
+                    .sort((a,b) => String(a.data[1]).localeCompare(b.data[1]));
+    
+    if(lista.length === 0) {
+        document.getElementById('zonaPreceptor').innerHTML = '<div class="alert alert-warning">No hay alumnos en este curso.</div>';
         return;
     }
 
-    let html = `
-    <div class="card shadow-sm">
-    <table class="table align-middle table-striped mb-0 text-center">
-        <thead class="table-dark">
-            <tr>
-                <th class="text-start">Estudiante</th>
-                <th>P</th>
-                <th>A</th>
-                <th>T</th>
-                <th>Justificar</th>
-            </tr>
-        </thead>
-        <tbody>`;
-
+    let html = `<div class="card shadow-sm"><table class="table align-middle table-striped mb-0 text-center">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-start">Estudiante</th>
+                        <th title="Faltas Acumuladas">F</th>
+                        <th title="Porcentaje Asistencia">%</th>
+                        <th style="background:#d4edda; color:green;">P</th>
+                        <th style="background:#f8d7da; color:red;">A</th>
+                        <th style="background:#fff3cd; color:#856404;">T</th>
+                        <th>Justificar</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+    
     lista.forEach(item => {
-        const alu = item.data;
+        const alu = item.data; // [DNI, Nombre, Curso...]
+        const st = item.stats; // { I, J, T, P, total }
+        
+        // Calcular porcentaje (P / (P+I+J+T)) aprox
+        const totalDias = st.P + st.I + st.J + st.T;
+        const porcentaje = totalDias > 0 ? Math.round((st.P / totalDias) * 100) + '%' : '-';
+        
+        // Alerta de faltas > 10
+        let alerta = "";
+        if(st.total >= 10) {
+            alerta = `<span class="badge bg-danger ms-2">⚠️ ${st.total}</span>`;
+        } else if(st.total > 0) {
+            alerta = `<span class="badge bg-light text-dark border ms-2">${st.total}</span>`;
+        }
+
         html += `
-        <tr>
-            <td class="text-start fw-bold">${alu[1]}</td>
-            <td><input type="radio" name="e_${alu[0]}" value="P" checked></td>
-            <td><input type="radio" name="e_${alu[0]}" value="A"></td>
-            <td><input type="radio" name="e_${alu[0]}" value="T"></td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary"
-                    onclick="abrirModalJustificar('${alu[0]}','${alu[1]}')">⚖️</button>
-            </td>
-        </tr>`;
+            <tr>
+                <td class="text-start fw-bold">
+                    ${alu[1]} ${alerta}
+                </td>
+                <td><small>${st.total}</small></td>
+                <td><small>${porcentaje}</small></td>
+                
+                <td style="background:#d4edda;">
+                    <input type="radio" name="e_${alu[0]}" value="P" checked style="transform: scale(1.3); cursor: pointer;">
+                </td>
+                
+                <td style="background:#f8d7da;">
+                    <input type="radio" name="e_${alu[0]}" value="A" style="transform: scale(1.3); cursor: pointer;">
+                </td>
+                
+                <td style="background:#fff3cd;">
+                    <input type="radio" name="e_${alu[0]}" value="T" style="transform: scale(1.3); cursor: pointer;">
+                </td>
+
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="abrirModalJustificar('${alu[0]}', '${alu[1]}')" title="Ver Historial / Justificar">
+                        ⚖️
+                    </button>
+                </td>
+            </tr>`;
     });
-
-    html += `
-        </tbody>
-    </table>
-    <div class="p-3 bg-light border-top">
-        <button onclick="guardarAsis()" class="btn btn-success w-100 btn-lg">
-            ✅ Guardar Asistencia del Día
-        </button>
-    </div>
-    </div>`;
-
+    html += `</tbody></table>
+             <div class="p-3 bg-light border-top">
+                <button onclick="guardarAsis()" class="btn btn-success w-100 btn-lg shadow">✅ Guardar Asistencia del Día</button>
+             </div>
+             </div>`;
     document.getElementById('zonaPreceptor').innerHTML = html;
 }
 
 async function guardarAsis() {
     const inputs = document.querySelectorAll('input[type="radio"]:checked');
     let lista = [];
-
-    inputs.forEach(inp => {
-        lista.push({
-            dni: inp.name.split('_')[1],
-            estado: inp.value
-        });
-    });
+    inputs.forEach(inp => lista.push({ dni: inp.name.split('_')[1], estado: inp.value }));
+    
+    const btn = document.querySelector('#zonaPreceptor button');
+    btn.innerText = "Guardando..."; btn.disabled = true;
 
     try {
-        await fetch(URL_API, {
-            method: 'POST',
-            body: JSON.stringify({
-                op: 'guardarAsistenciaMasiva',
-                lista: lista,
-                preceptor: usuarioActual.nombre
-            })
-        });
-
-        alert("¡Asistencia guardada!");
+        await fetch(URL_API, { method: 'POST', body: JSON.stringify({ 
+            op: 'guardarAsistenciaMasiva', 
+            lista: lista, 
+            preceptor: usuarioActual.nombre 
+        })});
+        alert("¡Asistencia del día guardada!");
+        // Recargar para actualizar contadores
         iniciarModuloPreceptor();
-
-    } catch (e) {
-        alert("Error al guardar asistencia.");
+    } catch(e) {
+        alert("Error al guardar.");
+        btn.innerText = "Reintentar"; btn.disabled = false;
     }
 }
 
-// ============================================================================
-// 5. JUSTIFICACIÓN – FIX DEFINITIVO
-// ============================================================================
+// --- FUNCIONES DE JUSTIFICACIÓN ---
 
 async function abrirModalJustificar(dni, nombre) {
     document.getElementById('just_nombre').innerText = nombre;
-    document.getElementById('just_lista').innerHTML =
-        '<div class="text-center"><div class="spinner-border spinner-border-sm"></div> Buscando faltas...</div>';
-
-    const modal = new bootstrap.Modal(document.getElementById('modalJustificar'));
-    modal.show();
-
+    document.getElementById('just_lista').innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm"></div> Buscando faltas...</div>';
+    
+    new bootstrap.Modal(document.getElementById('modalJustificar')).show();
+    
     try {
         const resp = await fetch(`${URL_API}?op=getHistorialAlumno&rol=Preceptor&dni=${dni}`);
         const json = await resp.json();
-
+        
         const contenedor = document.getElementById('just_lista');
         contenedor.innerHTML = "";
 
-        if (!json.data || json.data.length === 0) {
-            contenedor.innerHTML =
-                '<div class="alert alert-success">No tiene inasistencias injustificadas.</div>';
+        if(json.data.length === 0) {
+            contenedor.innerHTML = '<div class="alert alert-success">¡Excelente! No tiene inasistencias injustificadas recientes.</div>';
             return;
         }
 
         let html = `<ul class="list-group">`;
         json.data.forEach(item => {
+            // item = { fila, fecha, estado }
+            let badge = item.estado === 'A' ? '<span class="badge bg-danger">Ausente</span>' : '<span class="badge bg-warning text-dark">Llegada Tarde</span>';
+            
             html += `
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <div><strong>${item.fecha}</strong></div>
-                <button class="btn btn-sm btn-outline-success"
-                    onclick="confirmarJustificacion(${item.fila}, '${dni}')">
-                    Justificar ✅
-                </button>
-            </li>`;
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${item.fecha}</strong> ${badge}
+                    </div>
+                    <button class="btn btn-sm btn-outline-success" onclick="confirmarJustificacion(${item.fila}, '${dni}')">
+                        Justificar ✅
+                    </button>
+                </li>`;
         });
         html += `</ul>`;
         contenedor.innerHTML = html;
 
-    } catch (e) {
-        document.getElementById('just_lista').innerHTML =
-            '<div class="alert alert-danger">Error al cargar historial.</div>';
+    } catch(e) {
+        document.getElementById('just_lista').innerHTML = "Error al cargar historial.";
     }
 }
 
 async function confirmarJustificacion(fila, dni) {
-    if (!confirm("¿Confirmás que esta falta está justificada?")) return;
-
-    document.getElementById('just_lista').innerHTML =
-        '<div class="text-center"><div class="spinner-border spinner-border-sm"></div> Justificando...</div>';
+    if(!confirm("¿Confirmas que esta falta está justificada?")) return;
+    
+    // UI feedback inmediato
+    document.getElementById('just_lista').innerHTML = '<div class="spinner-border spinner-border-sm"></div> Procesando...';
 
     try {
-        const resp = await fetch(URL_API, {
-            method: 'POST',
-            body: JSON.stringify({
-                op: 'justificarFalta',
-                fila: fila
-            })
-        });
-
-        const json = await resp.json();
-        if (json.status !== 'success') throw new Error();
-
+        await fetch(URL_API, { method: 'POST', body: JSON.stringify({ 
+            op: 'justificarFalta', 
+            fila: fila 
+        })});
+        // Recargar modal para ver cambios
         const alumno = baseDatosAlumnos.find(obj => String(obj.data[0]) === String(dni));
-        if (alumno) abrirModalJustificar(dni, alumno.data[1]);
+        if(alumno) abrirModalJustificar(dni, alumno.data[1]);
+        
+        // Actualizar tabla fondo
+        iniciarModuloPreceptor(); 
 
-    } catch (e) {
-        alert("Error al justificar la falta.");
+    } catch(e) {
+        alert("Error al justificar.");
     }
 }
+
+// ==========================================
+// 5. UTILIDADES Y MODALES
+// ==========================================
+
+function calcularEdad(fechaString) {
+    if (!fechaString) return "-";
+    const hoy = new Date();
+    const nacimiento = new Date(fechaString);
+    let edad = hoy.getFullYear() - nacimiento.getFullYear();
+    const mes = hoy.getMonth() - nacimiento.getMonth();
+    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) { edad--; }
+    return isNaN(edad) ? "-" : edad + " años";
+}
+
 function renderModalJustificacionHTML() {
     return `
     <div class="modal fade" id="modalJustificar" tabindex="-1">
@@ -772,4 +795,3 @@ function renderModalAsignacionHTML() {
       </div>
     </div>`;
 }
-
