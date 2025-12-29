@@ -587,7 +587,15 @@ async function abrirModalJustificar(dni, nombre) {
     document.getElementById('just_nombre').innerText = nombre;
     document.getElementById('just_lista').innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm"></div> Buscando faltas...</div>';
     
-    new bootstrap.Modal(document.getElementById('modalJustificar')).show();
+    // --- CORRECCIÓN ---
+    const modalEl = document.getElementById('modalJustificar');
+    // Intentamos obtener la instancia existente, si no existe, Bootstrap la crea (o la creamos manual si es una versión vieja)
+    let modal = bootstrap.Modal.getInstance(modalEl);
+    if (!modal) {
+        modal = new bootstrap.Modal(modalEl);
+    }
+    modal.show();
+    // ------------------
     
     try {
         const resp = await fetch(`${URL_API}?op=getHistorialAlumno&rol=Preceptor&dni=${dni}`);
@@ -789,5 +797,6 @@ function renderModalAsignacionHTML() {
       </div>
     </div>`;
 }
+
 
 
