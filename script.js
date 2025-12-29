@@ -93,8 +93,39 @@ async function verEstudiantes() {
                 <h5>Gestión de Estudiantes</h5>
                 <button onclick="abrirModalEstudiante()" class="btn btn-success">+ Nuevo Estudiante</button>
             </div>
+            
+            <!-- BUSCADOR DE ESTUDIANTES -->
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-8">
+                            <div class="input-group">
+                                <span class="input-group-text">🔍</span>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="buscadorEstudiantes" 
+                                       placeholder="Buscar por nombre, DNI, curso, email..." 
+                                       onkeyup="filtrarEstudiantes()">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <select class="form-select" id="filtroEstudiantes" onchange="filtrarEstudiantes()">
+                                <option value="todos">Todos los campos</option>
+                                <option value="nombre">Nombre</option>
+                                <option value="dni">DNI</option>
+                                <option value="curso">Curso</option>
+                                <option value="email">Email</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-muted small">
+                        <span id="contadorEstudiantes">${json.data.length} estudiantes encontrados</span>
+                    </div>
+                </div>
+            </div>
+            
             <div class="table-responsive bg-white rounded shadow-sm" style="max-height: 600px; overflow-y: auto;">
-                <table class="table table-hover table-bordered mb-0 align-middle">
+                <table class="table table-hover table-bordered mb-0 align-middle" id="tablaEstudiantes">
                     <thead class="table-dark text-center" style="position: sticky; top: 0;">
                         <tr>
                             <th>DNI</th>
@@ -104,12 +135,12 @@ async function verEstudiantes() {
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody>`;
+                    <tbody id="tbodyEstudiantes">`;
         
         json.data.forEach((fila, index) => {
             const edad = calcularEdad(fila[6]);
             html += `
-                <tr>
+                <tr class="fila-estudiante" data-dni="${fila[0]}" data-nombre="${fila[1].toLowerCase()}" data-curso="${fila[2]}" data-email="${fila[3]}">
                     <td>${fila[0]}</td>
                     <td>${fila[1]}</td>
                     <td class="text-center fw-bold text-primary">${edad}</td>
@@ -132,6 +163,7 @@ async function verEstudiantes() {
         alert("Error al cargar la lista de estudiantes.");
     }
 }
+
 
 // --- LÓGICA DE INSCRIPCIÓN ---
 
@@ -282,6 +314,55 @@ function editarEstudiante(index) {
     new bootstrap.Modal(document.getElementById('modalEstudiante')).show();
 }
 
+// ==========================================
+// FILTRADO DE ESTUDIANTES
+// ==========================================
+
+function filtrarEstudiantes() {
+    const busqueda = document.getElementById('buscadorEstudiantes').value.toLowerCase();
+    const filtro = document.getElementById('filtroEstudiantes').value;
+    const filas = document.querySelectorAll('#tbodyEstudiantes tr.fila-estudiante');
+    let contador = 0;
+    
+    filas.forEach(fila => {
+        let mostrar = false;
+        
+        if (!busqueda) {
+            mostrar = true;
+        } else {
+            switch(filtro) {
+                case 'nombre':
+                    mostrar = fila.dataset.nombre.includes(busqueda);
+                    break;
+                case 'dni':
+                    mostrar = fila.dataset.dni.includes(busqueda);
+                    break;
+                case 'curso':
+                    mostrar = fila.dataset.curso.toLowerCase().includes(busqueda);
+                    break;
+                case 'email':
+                    mostrar = fila.dataset.email.toLowerCase().includes(busqueda);
+                    break;
+                case 'todos':
+                    mostrar = fila.dataset.nombre.includes(busqueda) || 
+                              fila.dataset.dni.includes(busqueda) ||
+                              fila.dataset.curso.toLowerCase().includes(busqueda) ||
+                              fila.dataset.email.toLowerCase().includes(busqueda);
+                    break;
+            }
+        }
+        
+        if (mostrar) {
+            fila.style.display = '';
+            contador++;
+        } else {
+            fila.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('contadorEstudiantes').innerText = `${contador} estudiantes encontrados`;
+}
+
 async function guardarEstudiante() {
     const btn = document.getElementById('btnGuardarModal');
     btn.disabled = true; btn.innerText = "Guardando...";
@@ -327,15 +408,44 @@ async function verDocentes() {
         const json = await resp.json();
         baseDatosDocentes = json.data;
 
-        console.log('Datos docentes cargados:', baseDatosDocentes); // DEBUG
-
         let html = `
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5>Gestión de Docentes</h5>
                 <button onclick="abrirModalDocente()" class="btn btn-success">+ Nuevo Docente</button>
             </div>
+            
+            <!-- BUSCADOR DE DOCENTES -->
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-8">
+                            <div class="input-group">
+                                <span class="input-group-text">🔍</span>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="buscadorDocentes" 
+                                       placeholder="Buscar por nombre, DNI, email, materias..." 
+                                       onkeyup="filtrarDocentes()">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <select class="form-select" id="filtroDocentes" onchange="filtrarDocentes()">
+                                <option value="todos">Todos los campos</option>
+                                <option value="nombre">Nombre</option>
+                                <option value="dni">DNI</option>
+                                <option value="email">Email</option>
+                                <option value="materias">Materias</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-muted small">
+                        <span id="contadorDocentes">${json.data.length} docentes encontrados</span>
+                    </div>
+                </div>
+            </div>
+            
             <div class="table-responsive bg-white rounded shadow-sm" style="max-height: 600px; overflow-y: auto;">
-                <table class="table table-hover table-bordered mb-0 align-middle">
+                <table class="table table-hover table-bordered mb-0 align-middle" id="tablaDocentes">
                     <thead class="table-dark text-center" style="position: sticky; top: 0;">
                         <tr>
                             <th>DNI</th>
@@ -345,26 +455,28 @@ async function verDocentes() {
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody>`;
+                    <tbody id="tbodyDocentes">`;
         
         json.data.forEach((fila, index) => {
             // fila[0]=DNI, fila[1]=Nombre, fila[2]=Email_ABC, fila[3]=Celular, fila[4]=Materias
             let materiasHTML = fila[4] || '';
             
-            // Verificar si hay materias suplantadas
             if(materiasHTML.includes('[SUPLANTADO]')) {
                 materiasHTML = materiasHTML.replace(/\[SUPLANTADO\]/g, 
                     '<span class="badge bg-danger me-1">[SUPLANTADO]</span>');
             }
             
-            // Verificar si hay suplencias
             if(materiasHTML.includes('[Suplencia]')) {
                 materiasHTML = materiasHTML.replace(/\[Suplencia\].*?\(Suplente de: (.*?)\)/g, 
                     '<span class="badge bg-warning text-dark me-1" title="Suplente de: $1">[Suplente]</span>');
             }
             
             html += `
-                <tr>
+                <tr class="fila-docente" 
+                    data-dni="${fila[0]}" 
+                    data-nombre="${fila[1].toLowerCase()}" 
+                    data-email="${fila[2] || ''}" 
+                    data-materias="${(fila[4] || '').toLowerCase()}">
                     <td>${fila[0]}</td>
                     <td class="fw-bold">${fila[1]}</td>
                     <td><small>${fila[2] || ''}<br>${fila[3] || ''}</small></td>
@@ -379,19 +491,17 @@ async function verDocentes() {
         
         html += `</tbody></table></div>`;
         
-        // IMPORTANTE: Asegurarnos de incluir el modal nuevo
         html += renderModalDocenteHTML(); 
-        html += renderModalAsignacionCompletaHTML(); // Este es el NUEVO modal
+        html += renderModalAsignacionCompletaHTML();
         
         document.getElementById('contenido-dinamico').innerHTML = html;
-        
-        console.log('Modal de asignación debería estar renderizado'); // DEBUG
         
     } catch (e) { 
         console.error('Error cargando docentes:', e);
         alert("Error cargando docentes: " + e.message); 
     }
 }
+
 // --- ASIGNACIÓN DE MATERIAS ---
 
 async function abrirModalAsignacion(index) {
@@ -548,6 +658,55 @@ function editarDocente(index) {
     document.getElementById('doc_email').value = doc[2];
     document.getElementById('doc_cel').value = doc[3];
     new bootstrap.Modal(document.getElementById('modalDocente')).show();
+}
+
+// ==========================================
+// FILTRADO DE DOCENTES
+// ==========================================
+
+function filtrarDocentes() {
+    const busqueda = document.getElementById('buscadorDocentes').value.toLowerCase();
+    const filtro = document.getElementById('filtroDocentes').value;
+    const filas = document.querySelectorAll('#tbodyDocentes tr.fila-docente');
+    let contador = 0;
+    
+    filas.forEach(fila => {
+        let mostrar = false;
+        
+        if (!busqueda) {
+            mostrar = true;
+        } else {
+            switch(filtro) {
+                case 'nombre':
+                    mostrar = fila.dataset.nombre.includes(busqueda);
+                    break;
+                case 'dni':
+                    mostrar = fila.dataset.dni.includes(busqueda);
+                    break;
+                case 'email':
+                    mostrar = fila.dataset.email.includes(busqueda);
+                    break;
+                case 'materias':
+                    mostrar = fila.dataset.materias.includes(busqueda);
+                    break;
+                case 'todos':
+                    mostrar = fila.dataset.nombre.includes(busqueda) || 
+                              fila.dataset.dni.includes(busqueda) ||
+                              fila.dataset.email.includes(busqueda) ||
+                              fila.dataset.materias.includes(busqueda);
+                    break;
+            }
+        }
+        
+        if (mostrar) {
+            fila.style.display = '';
+            contador++;
+        } else {
+            fila.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('contadorDocentes').innerText = `${contador} docentes encontrados`;
 }
 
 async function guardarDocente() {
@@ -731,7 +890,6 @@ async function verContactosDocentes() {
     document.getElementById('contenido-dinamico').innerHTML = '<div class="spinner-border text-info"></div> Cargando Directorio de Docentes...';
     
     try {
-        // Reutilizamos el endpoint getDocentes pero con rol Preceptor
         const resp = await fetch(`${URL_API}?op=getDocentes&rol=Preceptor`);
         const json = await resp.json();
         
@@ -742,8 +900,38 @@ async function verContactosDocentes() {
 
         let html = `
             <h5 class="mb-3">📞 Directorio de Docentes</h5>
+            
+            <!-- BUSCADOR DE CONTACTOS -->
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-8">
+                            <div class="input-group">
+                                <span class="input-group-text">🔍</span>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="buscadorContactos" 
+                                       placeholder="Buscar por nombre, email, teléfono..." 
+                                       onkeyup="filtrarContactos()">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <select class="form-select" id="filtroContactos" onchange="filtrarContactos()">
+                                <option value="todos">Todos los campos</option>
+                                <option value="nombre">Nombre</option>
+                                <option value="email">Email</option>
+                                <option value="telefono">Teléfono</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-muted small">
+                        <span id="contadorContactos">${json.data.length} docentes encontrados</span>
+                    </div>
+                </div>
+            </div>
+            
             <div class="table-responsive bg-white rounded shadow-sm">
-                <table class="table table-hover table-striped mb-0 align-middle">
+                <table class="table table-hover table-striped mb-0 align-middle" id="tablaContactos">
                     <thead class="table-dark">
                         <tr>
                             <th>Docente</th>
@@ -751,22 +939,24 @@ async function verContactosDocentes() {
                             <th>Contacto Rápido</th>
                         </tr>
                     </thead>
-                    <tbody>`;
+                    <tbody id="tbodyContactos">`;
         
-        json.data.forEach(d => {
+        json.data.forEach((d, index) => {
             // d[0]=dni, d[1]=nombre, d[2]=email, d[3]=celular
-            let cel = d[3] ? d[3].toString().replace(/[^0-9]/g, '') : ''; // Limpiar numero
+            let cel = d[3] ? d[3].toString().replace(/[^0-9]/g, '') : '';
             let btnWsp = '';
             
             if(cel.length > 6) {
-                // Asumimos código de país 54 (Argentina) si no lo tiene, o usar tal cual.
                 btnWsp = `<a href="https://wa.me/549${cel}" target="_blank" class="btn btn-success btn-sm text-white fw-bold">📱 WhatsApp</a>`;
             } else {
                 btnWsp = `<span class="text-muted small">Sin celular</span>`;
             }
 
             html += `
-                <tr>
+                <tr class="fila-contacto" 
+                    data-nombre="${d[1].toLowerCase()}" 
+                    data-email="${d[2].toLowerCase()}" 
+                    data-telefono="${cel}">
                     <td class="fw-bold">${d[1]}</td>
                     <td><a href="mailto:${d[2]}">${d[2]}</a></td>
                     <td>${btnWsp}</td>
@@ -846,6 +1036,51 @@ async function confirmarJustificacion(fila, dni) {
         const modal = bootstrap.Modal.getInstance(modalEl);
         if(modal) modal.hide();
     }
+}
+
+// ==========================================
+// FILTRADO DE CONTACTOS
+// ==========================================
+
+function filtrarContactos() {
+    const busqueda = document.getElementById('buscadorContactos').value.toLowerCase();
+    const filtro = document.getElementById('filtroContactos').value;
+    const filas = document.querySelectorAll('#tbodyContactos tr.fila-contacto');
+    let contador = 0;
+    
+    filas.forEach(fila => {
+        let mostrar = false;
+        
+        if (!busqueda) {
+            mostrar = true;
+        } else {
+            switch(filtro) {
+                case 'nombre':
+                    mostrar = fila.dataset.nombre.includes(busqueda);
+                    break;
+                case 'email':
+                    mostrar = fila.dataset.email.includes(busqueda);
+                    break;
+                case 'telefono':
+                    mostrar = fila.dataset.telefono.includes(busqueda);
+                    break;
+                case 'todos':
+                    mostrar = fila.dataset.nombre.includes(busqueda) || 
+                              fila.dataset.email.includes(busqueda) ||
+                              fila.dataset.telefono.includes(busqueda);
+                    break;
+            }
+        }
+        
+        if (mostrar) {
+            fila.style.display = '';
+            contador++;
+        } else {
+            fila.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('contadorContactos').innerText = `${contador} docentes encontrados`;
 }
 
 // ==========================================
@@ -1019,3 +1254,4 @@ function renderModalAsignacionCompletaHTML() {
       </div>
     </div>`;
 }
+
