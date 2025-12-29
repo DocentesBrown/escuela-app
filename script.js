@@ -450,17 +450,18 @@ async function borrarDocente(dni, email) {
 // 4. MÓDULO PRECEPTOR MEJORADO
 // ==========================================
 
-async function iniciarModuloPreceptor() {
+// Aceptamos un parámetro opcional "cursoArecordar"
+async function iniciarModuloPreceptor(cursoArecordar = null) {
     document.getElementById('contenido-dinamico').innerHTML = `<div class="spinner-border spinner-border-sm"></div> Cargando datos y estadísticas...`;
     
     try {
         // Obtenemos alumnos Y estadísticas de faltas
         const resp = await fetch(`${URL_API}?op=getDataPreceptor&rol=Preceptor`);
         const json = await resp.json();
-        // data ahora trae objetos { data: [ArrayAlumno], stats: { I:0, J:0, T:0, P:0, total: 0 } }
+        
         baseDatosAlumnos = json.data; 
         
-        // Extraemos cursos únicos desde el objeto interno 'data' (índice 2 es Curso)
+        // Extraemos cursos únicos
         const cursos = [...new Set(baseDatosAlumnos.map(obj => obj.data[2]))].sort();
         let opts = cursos.map(c => `<option value="${c}">${c}</option>`).join('');
         
@@ -468,13 +469,25 @@ async function iniciarModuloPreceptor() {
             <div class="card p-3 shadow-sm mb-3">
                 <h5>📅 Control de Asistencia</h5>
                 <select id="selCurso" class="form-select form-select-lg" onchange="renderTablaPreceptor()">
-                    <option selected disabled>Elige un Curso</option>${opts}
+                    <option selected disabled value="">Elige un Curso</option>${opts}
                 </select>
                 <div id="resumenClase" class="mt-2 text-muted small"></div>
             </div>
             <div id="zonaPreceptor"></div>
             ${renderModalJustificacionHTML()}
             `;
+
+        // --- MAGIA NUEVA: SI HABÍA UN CURSO SELECCIONADO, LO PONEMOS OTRA VEZ ---
+        if (cursoArecordar) {
+            const select = document.getElementById('selCurso');
+            // Verificamos que el curso siga existiendo en el select
+            if ([...select.options].some(opt => opt.value === cursoArecordar)) {
+                select.value = cursoArecordar;
+                renderTablaPreceptor(); // Mostramos la tabla automáticamente
+            }
+        }
+        // -------------------------------------------------------------------------
+
     } catch(e) {
         console.log(e);
         document.getElementById('contenido-dinamico').innerHTML = `<div class="alert alert-danger">Error de conexión.</div>`;
@@ -635,35 +648,33 @@ async function abrirModalJustificar(dni, nombre) {
 async function confirmarJustificacion(fila, dni) {
     if(!confirm("¿Confirmas que esta falta está justificada?")) return;
     
-    // 1. Ponemos el cartel de carga
+    // 1. GUARDAMOS EL CURSO ACTUAL ANTES DE RECARGAR
+    const cursoActual = document.getElementById('selCurso') ? document.getElementById('selCurso').value : null;
+
+    // Ponemos cartel de carga
     const contenedor = document.getElementById('just_lista');
     contenedor.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><br>Guardando cambios...</div>';
 
     try {
-        // 2. Enviamos la orden a Google Sheets
+        // Enviamos datos
         await fetch(URL_API, { method: 'POST', body: JSON.stringify({ 
             op: 'justificarFalta', 
             fila: fila 
         })});
 
-        // 3. CERRAR EL MODAL
-        // Obtenemos la ventana modal y la ocultamos
+        // Cerramos modal
         const modalEl = document.getElementById('modalJustificar');
         const modal = bootstrap.Modal.getInstance(modalEl); 
-        if(modal) {
-            modal.hide();
-        }
+        if(modal) modal.hide();
 
-        // 4. ÉXITO Y ACTUALIZAR
         alert("¡Justificación guardada correctamente!");
         
-        // Recargamos todo para que bajen las faltas en la tabla principal
-        iniciarModuloPreceptor();
+        // 2. RECARGAMOS PASÁNDOLE EL CURSO PARA QUE VUELVA AHI
+        iniciarModuloPreceptor(cursoActual);
 
     } catch(e) {
         console.error(e);
         alert("Ocurrió un error al intentar justificar.");
-        // Si falla, cerramos el modal para que no se trabe
         const modalEl = document.getElementById('modalJustificar');
         const modal = bootstrap.Modal.getInstance(modalEl);
         if(modal) modal.hide();
@@ -818,6 +829,7 @@ function renderModalAsignacionHTML() {
       </div>
     </div>`;
 }
+
 
 
 
