@@ -635,39 +635,41 @@ async function abrirModalJustificar(dni, nombre) {
 async function confirmarJustificacion(fila, dni) {
     if(!confirm("¿Confirmas que esta falta está justificada?")) return;
     
-    // Mostramos que está trabajando
-    document.getElementById('just_lista').innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><br>Guardando cambios...</div>';
+    // 1. Ponemos el cartel de carga
+    const contenedor = document.getElementById('just_lista');
+    contenedor.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><br>Guardando cambios...</div>';
 
     try {
-        // 1. Enviamos la orden al servidor
+        // 2. Enviamos la orden a Google Sheets
         await fetch(URL_API, { method: 'POST', body: JSON.stringify({ 
             op: 'justificarFalta', 
             fila: fila 
         })});
 
-        // 2. CERRAR EL MODAL
-        // Buscamos la instancia abierta y la cerramos
+        // 3. CERRAR EL MODAL
+        // Obtenemos la ventana modal y la ocultamos
         const modalEl = document.getElementById('modalJustificar');
-        const modal = bootstrap.Modal.getInstance(modalEl);
+        const modal = bootstrap.Modal.getInstance(modalEl); 
         if(modal) {
             modal.hide();
         }
 
-        // 3. AVISAR Y ACTUALIZAR
+        // 4. ÉXITO Y ACTUALIZAR
         alert("¡Justificación guardada correctamente!");
         
-        // Recargamos el módulo para que bajen los contadores de faltas en la tabla principal
+        // Recargamos todo para que bajen las faltas en la tabla principal
         iniciarModuloPreceptor();
 
     } catch(e) {
         console.error(e);
         alert("Ocurrió un error al intentar justificar.");
-        // Si falla, cerramos el modal igual para no dejarlo trabado
+        // Si falla, cerramos el modal para que no se trabe
         const modalEl = document.getElementById('modalJustificar');
         const modal = bootstrap.Modal.getInstance(modalEl);
         if(modal) modal.hide();
     }
 }
+
 // ==========================================
 // 5. UTILIDADES Y MODALES
 // ==========================================
@@ -816,6 +818,7 @@ function renderModalAsignacionHTML() {
       </div>
     </div>`;
 }
+
 
 
 
