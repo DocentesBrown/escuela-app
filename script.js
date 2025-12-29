@@ -581,7 +581,7 @@ function renderTablaPreceptor() {
     document.getElementById('zonaPreceptor').innerHTML = html;
 }
 
-async function guardarAsistencia() {
+async function guardarAsis() {
     const curso = document.getElementById('selCurso').value;
     
     // 1. OBTENEMOS LA FECHA ELEGIDA
@@ -877,6 +877,7 @@ function renderModalAsignacionHTML() {
       </div>
     </div>`;
 }
+
 
 
 
