@@ -321,10 +321,13 @@ async function borrarEstudiante(dni, email) {
 
 async function verDocentes() {
     document.getElementById('contenido-dinamico').innerHTML = '<div class="spinner-border text-primary"></div> Cargando Docentes...';
+    
     try {
         const resp = await fetch(`${URL_API}?op=getDocentes&rol=Directivo`);
         const json = await resp.json();
         baseDatosDocentes = json.data;
+
+        console.log('Datos docentes cargados:', baseDatosDocentes); // DEBUG
 
         let html = `
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -334,16 +337,38 @@ async function verDocentes() {
             <div class="table-responsive bg-white rounded shadow-sm" style="max-height: 600px; overflow-y: auto;">
                 <table class="table table-hover table-bordered mb-0 align-middle">
                     <thead class="table-dark text-center" style="position: sticky; top: 0;">
-                        <tr><th>DNI</th><th>Nombre</th><th>Contacto</th><th>Acciones</th></tr>
+                        <tr>
+                            <th>DNI</th>
+                            <th>Nombre</th>
+                            <th>Contacto</th>
+                            <th>Materias Asignadas</th>
+                            <th>Acciones</th>
+                        </tr>
                     </thead>
                     <tbody>`;
         
         json.data.forEach((fila, index) => {
+            // fila[0]=DNI, fila[1]=Nombre, fila[2]=Email_ABC, fila[3]=Celular, fila[4]=Materias
+            let materiasHTML = fila[4] || '';
+            
+            // Verificar si hay materias suplantadas
+            if(materiasHTML.includes('[SUPLANTADO]')) {
+                materiasHTML = materiasHTML.replace(/\[SUPLANTADO\]/g, 
+                    '<span class="badge bg-danger me-1">[SUPLANTADO]</span>');
+            }
+            
+            // Verificar si hay suplencias
+            if(materiasHTML.includes('[Suplencia]')) {
+                materiasHTML = materiasHTML.replace(/\[Suplencia\].*?\(Suplente de: (.*?)\)/g, 
+                    '<span class="badge bg-warning text-dark me-1" title="Suplente de: $1">[Suplente]</span>');
+            }
+            
             html += `
                 <tr>
                     <td>${fila[0]}</td>
-                    <td>${fila[1]}</td>
-                    <td><small>${fila[2]}<br>${fila[3]}</small></td>
+                    <td class="fw-bold">${fila[1]}</td>
+                    <td><small>${fila[2] || ''}<br>${fila[3] || ''}</small></td>
+                    <td><small>${materiasHTML}</small></td>
                     <td class="text-center" style="width: 160px;">
                         <button class="btn btn-sm btn-outline-warning me-1" onclick="abrirModalAsignacion(${index})" title="Asignar Materia">📚</button>
                         <button class="btn btn-sm btn-outline-primary me-1" onclick="editarDocente(${index})" title="Editar">✏️</button>
@@ -351,59 +376,156 @@ async function verDocentes() {
                     </td>
                 </tr>`;
         });
+        
         html += `</tbody></table></div>`;
+        
+        // IMPORTANTE: Asegurarnos de incluir el modal nuevo
         html += renderModalDocenteHTML(); 
-        html += renderModalAsignacionHTML(); 
+        html += renderModalAsignacionCompletaHTML(); // Este es el NUEVO modal
+        
         document.getElementById('contenido-dinamico').innerHTML = html;
-    } catch (e) { alert("Error cargando docentes."); }
+        
+        console.log('Modal de asignación debería estar renderizado'); // DEBUG
+        
+    } catch (e) { 
+        console.error('Error cargando docentes:', e);
+        alert("Error cargando docentes: " + e.message); 
+    }
 }
-
 // --- ASIGNACIÓN DE MATERIAS ---
 
 async function abrirModalAsignacion(index) {
+    console.log('Abrir modal asignación llamado con índice:', index); // DEBUG
+    
     const doc = baseDatosDocentes[index];
+    console.log('Docente seleccionado:', doc); // DEBUG
+    
     document.getElementById('asig_dni_docente').value = doc[0];
     document.getElementById('asig_nombre_docente').value = doc[1];
     document.getElementById('span_nombre_docente').innerText = doc[1];
 
     const select = document.getElementById('sel_materia_asig');
+    const tipoSelect = document.getElementById('tipo_asignacion');
+    
     select.innerHTML = '<option>Cargando materias...</option>';
-    new bootstrap.Modal(document.getElementById('modalAsignacion')).show();
+    tipoSelect.innerHTML = `
+        <option value="Titular" selected>Titular</option>
+        <option value="Provisional">Provisional</option>
+        <option value="Interino">Interino</option>
+        <option value="Suplencia">Suplencia</option>
+    `;
+    
+    // Configurar evento para mostrar/ocultar info de suplente
+    tipoSelect.onchange = function() {
+        console.log('Tipo de asignación cambiado a:', this.value); // DEBUG
+        const suplenteInfoDiv = document.getElementById('suplente_info');
+        if(this.value === 'Suplencia') {
+            suplenteInfoDiv.classList.remove('d-none');
+        } else {
+            suplenteInfoDiv.classList.add('d-none');
+        }
+    };
+
+    // Mostrar el modal
+    const modalEl = document.getElementById('modalAsignacionCompleta');
+    console.log('Elemento modal encontrado:', modalEl); // DEBUG
+    
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+    console.log('Modal mostrado'); // DEBUG
 
     try {
         const resp = await fetch(`${URL_API}?op=getMaterias&rol=Directivo`);
         const json = await resp.json();
+        baseDatosMaterias = json.data;
+        
+        console.log('Materias cargadas:', baseDatosMaterias); // DEBUG
+        
         let opts = `<option value="" selected disabled>Selecciona la materia...</option>`;
         
         json.data.forEach(mat => {
+            // mat[0]=ID_Materia, mat[1]=Nombre, mat[2]=DNI_Docente, mat[3]=Curso, mat[4]=Nombre_Docente
             const nombreProfe = mat[4] ? mat[4].toString().trim() : "";
-            let estilo = nombreProfe !== "" ? `style="color: #333;"` : `style="color: red; font-weight: bold;"`;
-            let texto = nombreProfe !== "" ? `${mat[1]} (${mat[3]}) - Prof: ${nombreProfe}` : `[VACANTE] ${mat[1]} (${mat[3]})`;
-            opts += `<option value="${mat[0]}" ${estilo}>${texto}</option>`;
+            
+            let estilo = "color: #333;";
+            let texto = `${mat[1]} (${mat[3]})`;
+            
+            if(nombreProfe) {
+                texto += ` - ${nombreProfe}`;
+                // Verificar si hay información de tipo de asignación
+                if(mat[5] && mat[5] === 'Suplencia') {
+                    estilo = "color: orange; font-weight: bold;";
+                    const suplenteDe = mat[6] || "";
+                    texto += ` [Suplente de: ${suplenteDe}]`;
+                } else if(mat[5]) {
+                    texto += ` [${mat[5]}]`;
+                }
+            } else {
+                estilo = "color: red; font-weight: bold;";
+                texto = `[VACANTE] ${mat[1]} (${mat[3]})`;
+            }
+            
+            opts += `<option value="${mat[0]}" style="${estilo}">${texto}</option>`;
         });
+        
         select.innerHTML = opts;
-    } catch (e) { select.innerHTML = '<option>Error al cargar materias</option>'; }
+        console.log('Opciones de materias cargadas en select'); // DEBUG
+        
+    } catch (e) { 
+        console.error('Error cargando materias:', e);
+        select.innerHTML = '<option>Error al cargar materias</option>'; 
+    }
 }
 
-async function guardarAsignacion() {
-    const btn = document.getElementById('btnGuardarAsig');
-    btn.disabled = true; btn.innerText = "Asignando...";
+async function guardarAsignacionCompleta() {
+    console.log('Guardar asignación completa llamado'); // DEBUG
+    
+    const btn = document.getElementById('btnGuardarAsigCompleta');
+    btn.disabled = true; 
+    btn.innerText = "Asignando...";
 
     const datos = {
         op: 'asignarDocenteMateria',
         id_materia: document.getElementById('sel_materia_asig').value,
         dni_docente: document.getElementById('asig_dni_docente').value,
-        nombre_docente: document.getElementById('asig_nombre_docente').value
+        nombre_docente: document.getElementById('asig_nombre_docente').value,
+        tipoAsignacion: document.getElementById('tipo_asignacion').value
     };
 
-    if(!datos.id_materia) { alert("Selecciona una materia."); btn.disabled = false; return; }
+    console.log('Datos a enviar:', datos); // DEBUG
+
+    if(!datos.id_materia) { 
+        alert("Selecciona una materia."); 
+        btn.disabled = false; 
+        btn.innerText = "Confirmar";
+        return; 
+    }
 
     try {
-        await fetch(URL_API, { method: 'POST', body: JSON.stringify(datos) });
-        bootstrap.Modal.getInstance(document.getElementById('modalAsignacion')).hide();
-        alert(`Materia asignada correctamente.`);
-    } catch (e) { alert("Error al asignar."); } 
-    finally { btn.disabled = false; btn.innerText = "Confirmar"; }
+        const response = await fetch(URL_API, { 
+            method: 'POST', 
+            body: JSON.stringify(datos) 
+        });
+        const result = await response.json();
+        
+        console.log('Respuesta del servidor:', result); // DEBUG
+        
+        if(result.status === 'success') {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalAsignacionCompleta'));
+            modal.hide();
+            alert(`✅ Materia asignada correctamente como ${datos.tipoAsignacion}.`);
+            verDocentes(); // Refrescar la vista
+        } else {
+            throw new Error(result.message || 'Error en la asignación');
+        }
+    } catch (e) { 
+        console.error('Error en asignación:', e);
+        alert("Error al asignar: " + e.message); 
+    } 
+    finally { 
+        btn.disabled = false; 
+        btn.innerText = "Confirmar"; 
+    }
 }
 
 // --- CRUD DOCENTE STANDARD ---
@@ -848,27 +970,50 @@ function renderModalDocenteHTML() {
     </div>`;
 }
 
-function renderModalAsignacionHTML() {
+function renderModalAsignacionCompletaHTML() {
     return `
-    <div class="modal fade" id="modalAsignacion" tabindex="-1">
+    <div class="modal fade" id="modalAsignacionCompleta" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header bg-warning">
             <h5 class="modal-title text-dark">Asignar Materia</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <p>Docente: <b><span id="span_nombre_docente"></span></b></p>
-            <input type="hidden" id="asig_dni_docente"><input type="hidden" id="asig_nombre_docente">
+            <input type="hidden" id="asig_dni_docente">
+            <input type="hidden" id="asig_nombre_docente">
+            
             <div class="mb-3">
-                <label>Seleccionar Materia:</label>
+                <label class="form-label">Tipo de Asignación:</label>
+                <select id="tipo_asignacion" class="form-select">
+                    <option value="Titular">Titular</option>
+                    <option value="Provisional">Provisional</option>
+                    <option value="Interino">Interino</option>
+                    <option value="Suplencia">Suplencia</option>
+                </select>
+                <div class="form-text">
+                    <small>
+                        <strong>Titular/Provisional/Interino:</strong> Reemplaza al docente anterior.<br>
+                        <strong>Suplencia:</strong> Marca en rojo al docente suplantado.
+                    </small>
+                </div>
+            </div>
+            
+            <div id="suplente_info" class="d-none alert alert-warning">
+                <small>⚠️ La materia aparecerá marcada como suplencia en el docente actual y se mantendrá el docente anterior como referencia.</small>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Seleccionar Materia:</label>
                 <select id="sel_materia_asig" class="form-select" size="8"></select>
-                <small class="text-danger fw-bold">* Las vacantes aparecen en rojo</small>
+                <small class="text-danger fw-bold">* Las vacantes aparecen en rojo</small><br>
+                <small class="text-warning fw-bold">* Las suplencias aparecen en naranja</small>
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="button" class="btn btn-dark" id="btnGuardarAsig" onclick="guardarAsignacion()">Confirmar</button>
+            <button type="button" class="btn btn-dark" id="btnGuardarAsigCompleta" onclick="guardarAsignacionCompleta()">Confirmar Asignación</button>
           </div>
         </div>
       </div>
