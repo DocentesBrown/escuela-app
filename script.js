@@ -455,38 +455,48 @@ async function iniciarModuloPreceptor(cursoArecordar = null) {
     document.getElementById('contenido-dinamico').innerHTML = `<div class="spinner-border spinner-border-sm"></div> Cargando datos y estadísticas...`;
     
     try {
-        // Obtenemos alumnos Y estadísticas de faltas
         const resp = await fetch(`${URL_API}?op=getDataPreceptor&rol=Preceptor`);
         const json = await resp.json();
         
         baseDatosAlumnos = json.data; 
         
-        // Extraemos cursos únicos
+        // Obtener fecha actual en formato YYYY-MM-DD para el input
+        const hoy = new Date();
+        // Ajustamos la zona horaria para que no de el día anterior si es tarde
+        const hoyISO = new Date(hoy.getTime() - (hoy.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
         const cursos = [...new Set(baseDatosAlumnos.map(obj => obj.data[2]))].sort();
         let opts = cursos.map(c => `<option value="${c}">${c}</option>`).join('');
         
         document.getElementById('contenido-dinamico').innerHTML = `
             <div class="card p-3 shadow-sm mb-3">
                 <h5>📅 Control de Asistencia</h5>
-                <select id="selCurso" class="form-select form-select-lg" onchange="renderTablaPreceptor()">
-                    <option selected disabled value="">Elige un Curso</option>${opts}
-                </select>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label">Curso:</label>
+                        <select id="selCurso" class="form-select form-select-lg" onchange="renderTablaPreceptor()">
+                            <option selected disabled value="">Elige un Curso</option>${opts}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha de Carga:</label>
+                        <input type="date" id="fechaAsistencia" class="form-control form-control-lg" value="${hoyISO}">
+                        <small class="text-muted">Puedes cambiar la fecha si cargas asistencia vieja.</small>
+                    </div>
+                </div>
                 <div id="resumenClase" class="mt-2 text-muted small"></div>
             </div>
             <div id="zonaPreceptor"></div>
             ${renderModalJustificacionHTML()}
             `;
 
-        // --- MAGIA NUEVA: SI HABÍA UN CURSO SELECCIONADO, LO PONEMOS OTRA VEZ ---
         if (cursoArecordar) {
             const select = document.getElementById('selCurso');
-            // Verificamos que el curso siga existiendo en el select
             if ([...select.options].some(opt => opt.value === cursoArecordar)) {
                 select.value = cursoArecordar;
-                renderTablaPreceptor(); // Mostramos la tabla automáticamente
+                renderTablaPreceptor();
             }
         }
-        // -------------------------------------------------------------------------
 
     } catch(e) {
         console.log(e);
@@ -571,26 +581,64 @@ function renderTablaPreceptor() {
     document.getElementById('zonaPreceptor').innerHTML = html;
 }
 
-async function guardarAsis() {
-    const inputs = document.querySelectorAll('input[type="radio"]:checked');
-    let lista = [];
-    inputs.forEach(inp => lista.push({ dni: inp.name.split('_')[1], estado: inp.value }));
+async function guardarAsistencia() {
+    const curso = document.getElementById('selCurso').value;
     
-    const btn = document.querySelector('#zonaPreceptor button');
-    btn.innerText = "Guardando..."; btn.disabled = true;
+    // 1. OBTENEMOS LA FECHA ELEGIDA
+    const inputFecha = document.getElementById('fechaAsistencia').value; // Viene como YYYY-MM-DD
+    if (!inputFecha) {
+        alert("Por favor selecciona una fecha válida.");
+        return;
+    }
+    // La convertimos a DD/MM/YYYY para Google Sheets
+    const partesFecha = inputFecha.split('-'); // [2025, 05, 20]
+    const fechaParaEnviar = `${partesFecha[2]}/${partesFecha[1]}/${partesFecha[0]}`;
+
+    if(!confirm(`¿Guardar asistencia del curso ${curso} para el día ${fechaParaEnviar}?`)) return;
+
+    // Recolectamos los datos de la tabla
+    const filas = document.querySelectorAll('#tablaAsistencia tbody tr');
+    let datosParaEnviar = [];
+
+    filas.forEach(tr => {
+        const dni = tr.dataset.dni;
+        const nombre = tr.dataset.nombre;
+        // Buscamos cuál radio está marcado (P, A, o T)
+        const estado = tr.querySelector(`input[name="asist_${dni}"]:checked`).value;
+        
+        datosParaEnviar.push({
+            dni: dni,
+            nombre: nombre,
+            estado: estado,
+            curso: curso,
+            fecha: fechaParaEnviar // Enviamos la fecha elegida
+        });
+    });
+
+    // Bloqueamos botón para evitar doble click
+    const btnGuardar = document.getElementById('btnGuardarAsist');
+    const textoOriginal = btnGuardar.innerHTML;
+    btnGuardar.disabled = true;
+    btnGuardar.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Guardando...`;
 
     try {
-        await fetch(URL_API, { method: 'POST', body: JSON.stringify({ 
-            op: 'guardarAsistenciaMasiva', 
-            lista: lista, 
-            preceptor: usuarioActual.nombre 
-        })});
-        alert("¡Asistencia del día guardada!");
-        // Recargar para actualizar contadores
-        iniciarModuloPreceptor();
+        await fetch(URL_API, {
+            method: 'POST',
+            body: JSON.stringify({
+                op: 'guardarAsistenciaLote',
+                datos: datosParaEnviar
+            })
+        });
+
+        alert("¡Asistencia guardada correctamente!");
+        // Recargamos manteniendo el curso seleccionado
+        iniciarModuloPreceptor(curso);
+
     } catch(e) {
-        alert("Error al guardar.");
-        btn.innerText = "Reintentar"; btn.disabled = false;
+        console.error(e);
+        alert("Error al guardar asistencia.");
+        btnGuardar.disabled = false;
+        btnGuardar.innerHTML = textoOriginal;
     }
 }
 
@@ -829,6 +877,7 @@ function renderModalAsignacionHTML() {
       </div>
     </div>`;
 }
+
 
 
 
