@@ -625,7 +625,7 @@ async function guardarAsis() {
         await fetch(URL_API, {
             method: 'POST',
             body: JSON.stringify({
-                op: 'guardarAsistenciaLote',
+                op: 'guardarAsistenciaMasiva',
                 datos: datosParaEnviar
             })
         });
@@ -877,6 +877,7 @@ function renderModalAsignacionHTML() {
       </div>
     </div>`;
 }
+
 
 
 
