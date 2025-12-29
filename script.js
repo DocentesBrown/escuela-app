@@ -154,7 +154,8 @@ async function abrirModalInscripcion(index) {
         
         let opciones = `<option value="">-- Seleccionar --</option>`;
         jsonMat.data.forEach(m => {
-            opciones += `<option value="${m[1]}">${m[1]} (${m[3]})</option>`;
+            // MODIFICACIÓN: Ahora el value incluye también el curso (m[3])
+            opciones += `<option value="${m[1]} (${m[3]})">${m[1]} (${m[3]})</option>`;
         });
 
         // 2. Construir el Formulario
@@ -324,7 +325,7 @@ async function guardarEstudiante() {
         await fetch(URL_API, { method: 'POST', body: JSON.stringify(datos) });
         bootstrap.Modal.getInstance(document.getElementById('modalEstudiante')).hide();
         alert("Operación exitosa.");
-        verEstudiantes(); 
+        verEstudiantes();
     } catch (e) {
         alert("Error al guardar.");
     }
@@ -332,15 +333,18 @@ async function guardarEstudiante() {
 
 async function borrarEstudiante(dni, email) {
     if(!confirm(`¿Seguro que deseas eliminar al alumno con DNI ${dni}?`)) return;
-    try { 
-        await fetch(URL_API, { 
-            method: 'POST', 
-            body: JSON.stringify({ op: 'administrarEstudiante', accion: 'borrar', dni: dni, email: email }) 
-        });
-        alert("Eliminado."); 
-        verEstudiantes(); 
-    } catch (e) { 
-        alert("Error al eliminar."); 
+
+    try {
+        await fetch(URL_API, { method: 'POST', body: JSON.stringify({
+            op: 'administrarEstudiante',
+            accion: 'borrar',
+            dni: dni,
+            email: email
+        })});
+        alert("Eliminado.");
+        verEstudiantes();
+    } catch (e) {
+        alert("Error al eliminar.");
     }
 }
 
@@ -389,8 +393,8 @@ async function verDocentes() {
         html += `</tbody></table></div>`;
         
         // Modales Docentes
-        html += renderModalDocenteHTML(); 
-        html += renderModalAsignacionHTML(); 
+        html += renderModalDocenteHTML();
+        html += renderModalAsignacionHTML();
         
         document.getElementById('contenido-dinamico').innerHTML = html;
     } catch (e) {
@@ -405,7 +409,7 @@ async function abrirModalAsignacion(index) {
     document.getElementById('asig_dni_docente').value = doc[0];
     document.getElementById('asig_nombre_docente').value = doc[1];
     document.getElementById('span_nombre_docente').innerText = doc[1];
-
+    
     const select = document.getElementById('sel_materia_asig');
     select.innerHTML = '<option>Cargando materias...</option>';
     
@@ -418,6 +422,7 @@ async function abrirModalAsignacion(index) {
         let opts = `<option value="" selected disabled>Selecciona la materia...</option>`;
         
         json.data.forEach(mat => {
+            // mat = [ID, Materia, DNI_Prof, Curso, Nombre_Prof]
             const nombreProfe = mat[4] ? mat[4].toString().trim() : "";
             const tieneProfe = nombreProfe !== "";
             
@@ -425,223 +430,108 @@ async function abrirModalAsignacion(index) {
             let texto = "";
 
             if (tieneProfe) {
-                texto = `${mat[1]} (${mat[3]}) - Prof: ${nombreProfe}`;
-                estilo = `style="color: #333;"`;
+                texto = `${mat[1]} (${mat[3]}) - Ocupada por ${nombreProfe}`;
+                estilo = "color: red; font-weight: bold;"; // ROJO SI ESTÁ OCUPADA
             } else {
-                texto = `[VACANTE] ${mat[1]} (${mat[3]})`;
-                estilo = `style="color: red; font-weight: bold;"`;
+                texto = `${mat[1]} (${mat[3]}) - VACANTE`;
+                estilo = "color: green; font-weight: bold;"; // VERDE SI ESTÁ LIBRE
             }
-            opts += `<option value="${mat[0]}" ${estilo}>${texto}</option>`;
+
+            opts += `<option value="${mat[0]}" style="${estilo}">${texto}</option>`;
         });
+
         select.innerHTML = opts;
 
     } catch (e) {
-        select.innerHTML = '<option>Error al cargar materias</option>';
+        select.innerHTML = '<option>Error cargando datos</option>';
     }
 }
+
 
 async function guardarAsignacion() {
-    const btn = document.getElementById('btnGuardarAsig');
-    btn.disabled = true; btn.innerText = "Asignando...";
+    const idMateria = document.getElementById('sel_materia_asig').value;
+    const dniDoc = document.getElementById('asig_dni_docente').value;
+    const nomDoc = document.getElementById('asig_nombre_docente').value;
 
-    const datos = {
-        op: 'asignarDocenteMateria',
-        id_materia: document.getElementById('sel_materia_asig').value,
-        dni_docente: document.getElementById('asig_dni_docente').value,
-        nombre_docente: document.getElementById('asig_nombre_docente').value
-    };
-
-    if(!datos.id_materia) {
-        alert("Debes seleccionar una materia.");
-        btn.disabled = false; btn.innerText = "Confirmar";
-        return;
-    }
+    if(!idMateria) return alert("Selecciona una materia.");
 
     try {
-        await fetch(URL_API, { method: 'POST', body: JSON.stringify(datos) });
+        await fetch(URL_API, { method: 'POST', body: JSON.stringify({
+            op: 'asignarDocenteMateria',
+            id_materia: idMateria,
+            dni_docente: dniDoc,
+            nombre_docente: nomDoc
+        })});
+        alert("Asignación guardada.");
         bootstrap.Modal.getInstance(document.getElementById('modalAsignacion')).hide();
-        alert(`Materia asignada correctamente a ${datos.nombre_docente}`);
+        verDocentes(); 
     } catch (e) {
         alert("Error al asignar.");
-    } finally {
-        btn.disabled = false; btn.innerText = "Confirmar Asignación";
     }
 }
 
-// --- CRUD DOCENTE STANDARD ---
+// --- CRUD DOCENTES ---
 
 function abrirModalDocente() {
-    document.getElementById('modalTitleDoc').innerText = "Nuevo Docente";
     document.getElementById('formDocente').reset();
-    document.getElementById('accion_doc').value = "crear";
-    document.getElementById('doc_dni').disabled = false;
-    document.getElementById('doc_email').disabled = false;
+    document.getElementById('accion_doc_form').value = "crear";
     new bootstrap.Modal(document.getElementById('modalDocente')).show();
 }
 
 function editarDocente(index) {
-    const doc = baseDatosDocentes[index];
-    document.getElementById('modalTitleDoc').innerText = "Editar Docente";
-    document.getElementById('accion_doc').value = "editar";
-    document.getElementById('doc_dni_orig').value = doc[0];
-    document.getElementById('doc_email_orig').value = doc[2];
+    const d = baseDatosDocentes[index];
+    document.getElementById('accion_doc_form').value = "editar";
+    document.getElementById('dni_doc_original').value = d[0];
+    document.getElementById('email_doc_original').value = d[2];
 
-    document.getElementById('doc_dni').value = doc[0];
-    document.getElementById('doc_nombre').value = doc[1];
-    document.getElementById('doc_email').value = doc[2];
-    document.getElementById('doc_cel').value = doc[3];
+    document.getElementById('inp_doc_dni').value = d[0];
+    document.getElementById('inp_doc_nombre').value = d[1];
+    document.getElementById('inp_doc_email').value = d[2];
+    document.getElementById('inp_doc_cel').value = d[3];
+
     new bootstrap.Modal(document.getElementById('modalDocente')).show();
 }
 
 async function guardarDocente() {
     const datos = {
         op: 'administrarDocente',
-        accion: document.getElementById('accion_doc').value,
-        dni: document.getElementById('doc_dni').value,
-        nombre: document.getElementById('doc_nombre').value,
-        email: document.getElementById('doc_email').value,
-        celular: document.getElementById('doc_cel').value,
-        dniOriginal: document.getElementById('doc_dni_orig').value,
-        emailOriginal: document.getElementById('doc_email_orig').value
+        accion: document.getElementById('accion_doc_form').value,
+        dni: document.getElementById('inp_doc_dni').value,
+        nombre: document.getElementById('inp_doc_nombre').value,
+        email: document.getElementById('inp_doc_email').value,
+        celular: document.getElementById('inp_doc_cel').value,
+        dniOriginal: document.getElementById('dni_doc_original').value,
+        emailOriginal: document.getElementById('email_doc_original').value
     };
+
     try {
         await fetch(URL_API, { method: 'POST', body: JSON.stringify(datos) });
         bootstrap.Modal.getInstance(document.getElementById('modalDocente')).hide();
-        alert("Docente guardado.");
-        verDocentes(); 
-    } catch (e) { alert("Error al guardar."); }
+        verDocentes();
+    } catch (e) {
+        alert("Error al guardar docente.");
+    }
 }
 
 async function borrarDocente(dni, email) {
-    if(!confirm(`¿Eliminar docente DNI ${dni}?`)) return;
-    try { 
-        await fetch(URL_API, { method: 'POST', body: JSON.stringify({ op: 'administrarDocente', accion: 'borrar', dni: dni, email: email }) });
-        alert("Eliminado."); 
-        verDocentes(); 
-    } catch (e) { alert("Error."); }
-}
-
-// ==========================================
-// 4. MÓDULO PRECEPTOR (ASISTENCIA RÁPIDA)
-// ==========================================
-
-async function iniciarModuloPreceptor() {
-    document.getElementById('contenido-dinamico').innerHTML = `<div class="spinner-border spinner-border-sm"></div> Descargando cursos y alumnos...`;
-    
+    if(!confirm("¿Eliminar docente?")) return;
     try {
-        const resp = await fetch(`${URL_API}?op=getDataPreceptor&rol=Preceptor`);
-        const json = await resp.json();
-        baseDatosAlumnos = json.data;
-        
-        // Detectar cursos únicos
-        const cursos = [...new Set(baseDatosAlumnos.map(f => f[2]))].sort();
-        let opts = cursos.map(c => `<option value="${c}">${c}</option>`).join('');
-        
-        document.getElementById('contenido-dinamico').innerHTML = `
-            <div class="card p-3 shadow-sm mb-3">
-                <h5>📅 Tomar Asistencia</h5>
-                <select id="selCurso" class="form-select form-select-lg" onchange="renderTablaPreceptor()">
-                    <option selected disabled>Elige un Curso</option>${opts}
-                </select>
-            </div>
-            <div id="zonaPreceptor"></div>`;
-    } catch(e) {
-        document.getElementById('contenido-dinamico').innerHTML = `<div class="alert alert-danger">Error de conexión.</div>`;
-    }
+        await fetch(URL_API, { method: 'POST', body: JSON.stringify({
+            op: 'administrarDocente', accion: 'borrar', dni: dni, email: email
+        })});
+        verDocentes();
+    } catch(e) { alert("Error."); }
 }
 
-function renderTablaPreceptor() {
-    const curso = document.getElementById('selCurso').value;
-    const lista = baseDatosAlumnos.filter(f => String(f[2]) === curso).sort((a,b) => String(a[1]).localeCompare(b[1]));
-    
-    if(lista.length === 0) {
-        document.getElementById('zonaPreceptor').innerHTML = '<div class="alert alert-warning">No hay alumnos en este curso.</div>';
-        return;
-    }
-
-    let html = `<div class="card shadow-sm"><table class="table align-middle table-striped mb-0">
-                <thead class="table-dark"><tr><th>Estudiante</th><th class="text-center">P</th><th class="text-center">A</th></tr></thead>
-                <tbody>`;
-    
-    lista.forEach(a => {
-        html += `
-            <tr>
-                <td class="fw-bold">${a[1]}</td>
-                <td class="text-center"><input type="radio" name="e_${a[0]}" value="P" checked style="transform: scale(1.4); cursor: pointer;"></td>
-                <td class="text-center"><input type="radio" name="e_${a[0]}" value="A" style="transform: scale(1.4); cursor: pointer;"></td>
-            </tr>`;
-    });
-    html += `</tbody></table>
-             <div class="p-3 bg-light"><button onclick="guardarAsis()" class="btn btn-success w-100 btn-lg shadow">✅ Guardar Asistencia</button></div>
-             </div>`;
-    document.getElementById('zonaPreceptor').innerHTML = html;
-}
-
-async function guardarAsis() {
-    const inputs = document.querySelectorAll('input[type="radio"]:checked');
-    let lista = [];
-    inputs.forEach(inp => lista.push({ dni: inp.name.split('_')[1], estado: inp.value }));
-    
-    // Feedback visual
-    const btn = document.querySelector('#zonaPreceptor button');
-    btn.innerText = "Guardando..."; btn.disabled = true;
-
-    try {
-        await fetch(URL_API, { method: 'POST', body: JSON.stringify({ op: 'guardarAsistenciaMasiva', lista: lista, preceptor: usuarioActual.nombre }) });
-        alert("¡Asistencia Guardada Exitosamente!");
-        document.getElementById('selCurso').value = "";
-        document.getElementById('zonaPreceptor').innerHTML = "";
-    } catch(e) {
-        alert("Error al guardar.");
-        btn.innerText = "Reintentar"; btn.disabled = false;
-    }
-}
 
 // ==========================================
-// 5. UTILIDADES Y TEMPLATES HTML (MODALES)
+// 4. HTML DE LOS MODALES (Templates)
 // ==========================================
 
-function calcularEdad(fechaString) {
-    if (!fechaString) return "-";
-    const hoy = new Date();
-    const nacimiento = new Date(fechaString);
-    let edad = hoy.getFullYear() - nacimiento.getFullYear();
-    const mes = hoy.getMonth() - nacimiento.getMonth();
-    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
-        edad--;
-    }
-    return isNaN(edad) ? "-" : edad + " años";
-}
-
-// HTML DEL MODAL INSCRIPCIÓN
-function renderModalInscripcionHTML() {
-    return `
-    <div class="modal fade" id="modalInscripcion" tabindex="-1">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header bg-success text-white">
-            <h5 class="modal-title" id="tituloInscripcion">Inscripción</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="ins_dni_est">
-            <input type="hidden" id="ins_nombre_est">
-            <div id="gridMaterias"></div> 
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="button" class="btn btn-success" id="btnGuardarIns" onclick="guardarInscripcion()">Guardar Cambios</button>
-          </div>
-        </div>
-      </div>
-    </div>`;
-}
-
-// HTML DEL MODAL ESTUDIANTE
 function renderModalHTML() {
     return `
     <div class="modal fade" id="modalEstudiante" tabindex="-1">
-      <div class="modal-dialog modal-lg">
+      <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header bg-primary text-white">
             <h5 class="modal-title" id="modalTitle">Estudiante</h5>
@@ -649,20 +539,17 @@ function renderModalHTML() {
           </div>
           <div class="modal-body">
             <form id="formEstudiante">
-                <input type="hidden" id="accion_form"><input type="hidden" id="dni_original"><input type="hidden" id="email_original">
+                <input type="hidden" id="accion_form">
+                <input type="hidden" id="dni_original"><input type="hidden" id="email_original">
+                <div class="mb-2"><label>DNI</label><input type="number" id="inp_dni" class="form-control"></div>
+                <div class="mb-2"><label>Nombre Completo</label><input type="text" id="inp_nombre" class="form-control"></div>
                 <div class="row">
-                    <div class="col-md-6 mb-2"><label>DNI</label><input type="number" id="inp_dni" class="form-control" required></div>
-                    <div class="col-md-6 mb-2"><label>Nacimiento</label><input type="date" id="inp_nacimiento" class="form-control"></div>
+                    <div class="col"><label>Curso</label><input type="text" id="inp_curso" class="form-control"></div>
+                    <div class="col"><label>Teléfono</label><input type="text" id="inp_tel" class="form-control"></div>
                 </div>
-                <div class="mb-2"><label>Nombre y Apellido</label><input type="text" id="inp_nombre" class="form-control" required></div>
-                <div class="row">
-                    <div class="col-md-6 mb-2"><label>Curso</label><input type="text" id="inp_curso" class="form-control" required></div>
-                    <div class="col-md-6 mb-2"><label>Email</label><input type="email" id="inp_email" class="form-control" required></div>
-                </div>
-                <div class="row">
-                    <div class="col-6 mb-2"><label>Adulto Resp.</label><input type="text" id="inp_adulto" class="form-control"></div>
-                    <div class="col-6 mb-2"><label>Teléfono</label><input type="text" id="inp_tel" class="form-control"></div>
-                </div>
+                <div class="mb-2"><label>Email</label><input type="email" id="inp_email" class="form-control"></div>
+                <div class="mb-2"><label>Adulto Responsable</label><input type="text" id="inp_adulto" class="form-control"></div>
+                <div class="mb-2"><label>Fecha Nacimiento</label><input type="date" id="inp_nacimiento" class="form-control"></div>
             </form>
           </div>
           <div class="modal-footer">
@@ -674,23 +561,45 @@ function renderModalHTML() {
     </div>`;
 }
 
-// HTML DEL MODAL DOCENTE
+function renderModalInscripcionHTML() {
+    return `
+    <div class="modal fade" id="modalInscripcion" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title" id="tituloInscripcion">Inscripción</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body bg-light">
+            <input type="hidden" id="ins_dni_est"><input type="hidden" id="ins_nombre_est">
+            <div id="gridMaterias"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            <button type="button" class="btn btn-success" id="btnGuardarIns" onclick="guardarInscripcion()">Guardar Cambios</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderModalDocenteHTML() {
     return `
     <div class="modal fade" id="modalDocente" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
-          <div class="modal-header bg-success text-white">
-            <h5 class="modal-title" id="modalTitleDoc">Docente</h5>
+          <div class="modal-header bg-dark text-white">
+            <h5 class="modal-title">Datos del Docente</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
             <form id="formDocente">
-                <input type="hidden" id="accion_doc"><input type="hidden" id="doc_dni_orig"><input type="hidden" id="doc_email_orig">
-                <div class="mb-2"><label>DNI</label><input type="number" id="doc_dni" class="form-control"></div>
-                <div class="mb-2"><label>Nombre</label><input type="text" id="doc_nombre" class="form-control"></div>
-                <div class="mb-2"><label>Email ABC</label><input type="email" id="doc_email" class="form-control"></div>
-                <div class="mb-2"><label>Celular</label><input type="text" id="doc_cel" class="form-control"></div>
+                <input type="hidden" id="accion_doc_form">
+                <input type="hidden" id="dni_doc_original"><input type="hidden" id="email_doc_original">
+                <div class="mb-2"><label>DNI</label><input type="number" id="inp_doc_dni" class="form-control"></div>
+                <div class="mb-2"><label>Nombre</label><input type="text" id="inp_doc_nombre" class="form-control"></div>
+                <div class="mb-2"><label>Email</label><input type="email" id="inp_doc_email" class="form-control"></div>
+                <div class="mb-2"><label>Celular</label><input type="text" id="inp_doc_cel" class="form-control"></div>
             </form>
           </div>
           <div class="modal-footer">
@@ -723,9 +632,27 @@ function renderModalAsignacionHTML() {
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="button" class="btn btn-dark" id="btnGuardarAsig" onclick="guardarAsignacion()">Confirmar</button>
+            <button type="button" class="btn btn-primary" onclick="guardarAsignacion()">Confirmar Asignación</button>
           </div>
         </div>
       </div>
     </div>`;
+}
+
+// --- UTILIDADES ---
+function calcularEdad(fechaNac) {
+    if (!fechaNac) return "-";
+    const hoy = new Date();
+    const nac = new Date(fechaNac);
+    let edad = hoy.getFullYear() - nac.getFullYear();
+    const mes = hoy.getMonth() - nac.getMonth();
+    if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getDate())) {
+        edad--;
+    }
+    return edad;
+}
+
+// --- PRECEPTOR (Solo Placeholders) ---
+function iniciarModuloPreceptor() {
+    document.getElementById('contenido-dinamico').innerHTML = `<h3>Panel de Preceptor</h3><p>Funcionalidad en desarrollo...</p>`;
 }
