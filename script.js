@@ -638,9 +638,6 @@ async function confirmarJustificacion(fila, dni) {
         // Recargar modal para ver cambios
         const alumno = baseDatosAlumnos.find(obj => String(obj.data[0]) === String(dni));
         if(alumno) abrirModalJustificar(dni, alumno.data[1]);
-        
-        // Actualizar tabla fondo
-        iniciarModuloPreceptor(); 
 
     } catch(e) {
         alert("Error al justificar.");
@@ -795,3 +792,4 @@ function renderModalAsignacionHTML() {
       </div>
     </div>`;
 }
+
