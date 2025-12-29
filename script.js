@@ -635,20 +635,39 @@ async function abrirModalJustificar(dni, nombre) {
 async function confirmarJustificacion(fila, dni) {
     if(!confirm("¿Confirmas que esta falta está justificada?")) return;
     
-    // UI feedback inmediato
-    document.getElementById('just_lista').innerHTML = '<div class="spinner-border spinner-border-sm"></div> Procesando...';
+    // Mostramos que está trabajando
+    document.getElementById('just_lista').innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><br>Guardando cambios...</div>';
 
     try {
+        // 1. Enviamos la orden al servidor
         await fetch(URL_API, { method: 'POST', body: JSON.stringify({ 
             op: 'justificarFalta', 
             fila: fila 
         })});
 
+        // 2. CERRAR EL MODAL
+        // Buscamos la instancia abierta y la cerramos
+        const modalEl = document.getElementById('modalJustificar');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if(modal) {
+            modal.hide();
+        }
+
+        // 3. AVISAR Y ACTUALIZAR
+        alert("¡Justificación guardada correctamente!");
+        
+        // Recargamos el módulo para que bajen los contadores de faltas en la tabla principal
+        iniciarModuloPreceptor();
+
     } catch(e) {
-        alert("Error al justificar.");
+        console.error(e);
+        alert("Ocurrió un error al intentar justificar.");
+        // Si falla, cerramos el modal igual para no dejarlo trabado
+        const modalEl = document.getElementById('modalJustificar');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if(modal) modal.hide();
     }
 }
-
 // ==========================================
 // 5. UTILIDADES Y MODALES
 // ==========================================
@@ -797,6 +816,7 @@ function renderModalAsignacionHTML() {
       </div>
     </div>`;
 }
+
 
 
 
