@@ -2059,546 +2059,283 @@ function calcularNotaIndividual(dni) {
 // 7. MÓDULO GESTIÓN DE PRECEPTORES (DIRECTIVO) - PESTAÑA SEPARADA
 // ==========================================
 
+// ==========================================
+// 4. MÓDULO DIRECTIVO: PRECEPTORES (CORREGIDO)
+// ==========================================
+
+let baseDatosPreceptores = []; // Variable global para guardar los datos
+
 async function verPreceptores() {
-    document.getElementById('contenido-dinamico').innerHTML = '<div class="spinner-border text-info"></div> Cargando Preceptores...';
+    const contenedor = document.getElementById('contenido-dinamico');
+    contenedor.innerHTML = '<div class="spinner-border text-primary"></div> Cargando Preceptores...';
     
     try {
+        // Solicitamos los datos al nuevo Backend mejorado
         const resp = await fetch(`${URL_API}?op=getPreceptoresAdmin&rol=Directivo`);
         const json = await resp.json();
         
         if (json.status !== 'success') {
-            document.getElementById('contenido-dinamico').innerHTML = '<p class="text-danger">Error al cargar preceptores.</p>';
+            contenedor.innerHTML = `<div class="alert alert-danger">Error: ${json.message}</div>`;
             return;
         }
 
+        baseDatosPreceptores = json.data; // Guardamos los datos recibidos (Objetos)
+
         let html = `
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5>👨‍🏫 Gestión de Preceptores</h5>
-                <button onclick="abrirModalPreceptor()" class="btn btn-info">+ Nuevo Preceptor</button>
+                <h5>Gestión de Preceptores</h5>
+                <button onclick="abrirModalPreceptor()" class="btn btn-success">+ Nuevo Preceptor</button>
             </div>
             
-            <!-- BUSCADOR DE PRECEPTORES -->
-            <div class="card mb-3 shadow-sm">
-                <div class="card-body">
-                    <div class="row g-2">
-                        <div class="col-md-8">
-                            <div class="input-group">
-                                <span class="input-group-text">🔍</span>
-                                <input type="text" 
-                                       class="form-control" 
-                                       id="buscadorPreceptores" 
-                                       placeholder="Buscar por nombre, DNI, email, cursos..." 
-                                       onkeyup="filtrarPreceptores()">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <select class="form-select" id="filtroPreceptores" onchange="filtrarPreceptores()">
-                                <option value="todos">Todos los campos</option>
-                                <option value="nombre">Nombre</option>
-                                <option value="dni">DNI</option>
-                                <option value="email">Email</option>
-                                <option value="cursos">Cursos</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-2 text-muted small">
-                        <span id="contadorPreceptores">${json.data.length} preceptores encontrados</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="table-responsive bg-white rounded shadow-sm" style="max-height: 600px; overflow-y: auto;">
-                <table class="table table-hover table-bordered mb-0 align-middle" id="tablaPreceptores">
-                    <thead class="table-dark text-center" style="position: sticky; top: 0;">
+            <div class="table-responsive bg-white rounded shadow-sm">
+                <table class="table table-hover table-bordered mb-0 align-middle">
+                    <thead class="table-dark text-center">
                         <tr>
                             <th>DNI</th>
                             <th>Nombre</th>
                             <th>Contacto</th>
-                            <th>Cursos Asignados</th>
+                            <th>Cursos a Cargo</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="tbodyPreceptores">`;
+                    <tbody>`;
         
+        // AQUI ESTABA EL ERROR: Ahora leemos propiedades (.dni, .nombre) en lugar de indices ([0])
         json.data.forEach((preceptor, index) => {
-            // Estructura de datos: [DNI, Nombre, Email_ABC, Celular, Cursos_Asignados]
-            const dni = preceptor[0] || '';
-            const nombre = preceptor[1] || '';
-            const email = preceptor[2] || '';
-            const celular = preceptor[3] || '';
-            const cursos = preceptor[4] || '';
-            
-            let cursosHTML = cursos || 'Sin cursos asignados';
-            if (cursosHTML && cursosHTML !== 'Sin cursos asignados') {
-                const cursosArray = cursosHTML.split(', ');
-                cursosHTML = cursosArray.map(curso => 
-                    `<span class="badge bg-primary me-1 mb-1" style="font-size: 0.8em">${curso}</span>`
-                ).join('');
-            }
-            
-        html += `
-            <tr class="fila-preceptor" 
-                data-dni="${dni}" 
-                data-nombre="${nombre.toLowerCase()}" 
-                data-email="${email.toLowerCase()}" 
-                data-cursos="${cursos.toLowerCase()}"
-                title="${tooltipText}">
-                <td>${dni}</td>
-                <td class="fw-bold">${nombre}</td>
-                <td>
-                    <small>
-                        <a href="mailto:${email}">${email}</a><br>
-                        ${celular || 'Sin teléfono'}
-                    </small>
-                </td>
-                <td>
-                    <div class="d-flex align-items-center">
-                        ${contadorCursos > 0 ? `<span class="badge bg-info me-2">${contadorCursos}</span>` : ''}
-                        <small>${cursosHTML}</small>
-                    </div>
-                </td>
-                <td class="text-center" style="width: 180px;">
-                    <button class="btn btn-sm btn-outline-warning me-1" onclick="abrirModalAsignarCursos(${index})" title="Asignar Cursos">🏫</button>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editarPreceptor(${index})" title="Editar">✏️</button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="borrarPreceptor('${dni}', '${email}')" title="Borrar">🗑️</button>
-                </td>
-            </tr>`;
+            let cursosHTML = preceptor.cursos ? 
+                preceptor.cursos.split(',').map(c => `<span class="badge bg-info text-dark me-1">${c.trim()}</span>`).join('') : 
+                '<span class="text-muted small">Sin asignar</span>';
+
+            html += `
+                <tr>
+                    <td>${preceptor.dni}</td>
+                    <td class="fw-bold">${preceptor.nombre}</td>
+                    <td><small>${preceptor.email}<br>${preceptor.celular || ''}</small></td>
+                    <td>${cursosHTML}</td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="abrirModalCursosPreceptor(${index})" title="Asignar Cursos">📚</button>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editarPreceptor(${index})" title="Editar">✏️</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="borrarPreceptor('${preceptor.dni}', '${preceptor.email}')" title="Borrar">🗑️</button>
+                    </td>
+                </tr>`;
         });
         
         html += `</tbody></table></div>`;
         
-        // Agregar modales
+        // Agregamos los Modales necesarios al HTML
         html += renderModalPreceptorHTML();
-        html += renderModalAsignarCursosHTML();
+        html += renderModalCursosPreceptorHTML();
         
-        document.getElementById('contenido-dinamico').innerHTML = html;
+        contenedor.innerHTML = html;
         
     } catch (e) {
-        console.error('Error cargando preceptores:', e);
-        document.getElementById('contenido-dinamico').innerHTML = '<p class="text-danger">Error de conexión.</p>';
+        console.error(e);
+        alert("Error al cargar preceptores: " + e.message);
     }
 }
 
-// FUNCIÓN DE FILTRADO
-function filtrarPreceptores() {
-    const busqueda = document.getElementById('buscadorPreceptores').value.toLowerCase();
-    const filtro = document.getElementById('filtroPreceptores').value;
-    const filas = document.querySelectorAll('#tbodyPreceptores tr.fila-preceptor');
-    let contador = 0;
-    
-    filas.forEach(fila => {
-        let mostrar = false;
-        
-        if (!busqueda) {
-            mostrar = true;
-        } else {
-            switch(filtro) {
-                case 'nombre':
-                    mostrar = fila.dataset.nombre.includes(busqueda);
-                    break;
-                case 'dni':
-                    mostrar = fila.dataset.dni.includes(busqueda);
-                    break;
-                case 'email':
-                    mostrar = fila.dataset.email.includes(busqueda);
-                    break;
-                case 'cursos':
-                    mostrar = fila.dataset.cursos.includes(busqueda);
-                    break;
-                case 'todos':
-                    mostrar = fila.dataset.nombre.includes(busqueda) || 
-                              fila.dataset.dni.includes(busqueda) ||
-                              fila.dataset.email.includes(busqueda) ||
-                              fila.dataset.cursos.includes(busqueda);
-                    break;
-            }
-        }
-        
-        if (mostrar) {
-            fila.style.display = '';
-            contador++;
-        } else {
-            fila.style.display = 'none';
-        }
-    });
-    
-    document.getElementById('contadorPreceptores').innerText = `${contador} preceptores encontrados`;
-}
+// --- FUNCIONES CRUD PRECEPTORES ---
 
-// MODAL PARA NUEVO/EDITAR PRECEPTOR
 function abrirModalPreceptor() {
-    document.getElementById('modalTitlePreceptor').innerText = "Nuevo Preceptor";
+    const modal = new bootstrap.Modal(document.getElementById('modalPreceptor'));
     document.getElementById('formPreceptor').reset();
+    document.getElementById('tituloModalPreceptor').innerText = "Nuevo Preceptor";
     document.getElementById('accion_preceptor').value = "crear";
-    document.getElementById('preceptor_dni').disabled = false;
-    document.getElementById('preceptor_email').disabled = false;
-    document.getElementById('preceptor_dni_orig').value = '';
-    document.getElementById('preceptor_email_orig').value = '';
-    
-    const modalEl = document.getElementById('modalPreceptor');
-    if (modalEl) {
-        new bootstrap.Modal(modalEl).show();
-    }
+    document.getElementById('prec_dni').disabled = false;
+    modal.show();
 }
 
 function editarPreceptor(index) {
-    const filas = document.querySelectorAll('#tbodyPreceptores tr.fila-preceptor');
-    const fila = filas[index];
+    const p = baseDatosPreceptores[index];
+    const modal = new bootstrap.Modal(document.getElementById('modalPreceptor'));
     
-    // Obtener datos de la fila
-    const dni = fila.dataset.dni;
-    const nombre = fila.querySelector('td:nth-child(2)').textContent.trim();
-    const email = fila.dataset.email;
-    
-    // Obtener celular (tercera celda, segunda línea)
-    const contactoCell = fila.querySelector('td:nth-child(3)');
-    const contactoHTML = contactoCell.innerHTML;
-    const celularMatch = contactoHTML.match(/<br>(.*?)<\/small>/);
-    const celular = celularMatch ? celularMatch[1].replace('Sin teléfono', '').trim() : '';
-    
-    document.getElementById('modalTitlePreceptor').innerText = "Editar Preceptor";
+    document.getElementById('tituloModalPreceptor').innerText = "Editar Preceptor";
     document.getElementById('accion_preceptor').value = "editar";
-    document.getElementById('preceptor_dni_orig').value = dni;
-    document.getElementById('preceptor_email_orig').value = email;
-    document.getElementById('preceptor_dni').value = dni;
-    document.getElementById('preceptor_dni').disabled = true;
-    document.getElementById('preceptor_nombre').value = nombre;
-    document.getElementById('preceptor_email').value = email;
-    document.getElementById('preceptor_email').disabled = true;
-    document.getElementById('preceptor_celular').value = celular;
+    document.getElementById('dni_original_preceptor').value = p.dni;
     
-    const modalEl = document.getElementById('modalPreceptor');
-    if (modalEl) {
-        new bootstrap.Modal(modalEl).show();
-    }
+    document.getElementById('prec_dni').value = p.dni;
+    document.getElementById('prec_nombre').value = p.nombre;
+    document.getElementById('prec_email').value = p.email;
+    document.getElementById('prec_celular').value = p.celular;
+    
+    modal.show();
 }
 
 async function guardarPreceptor() {
     const btn = document.getElementById('btnGuardarPreceptor');
-    btn.disabled = true;
-    btn.innerText = "Guardando...";
+    btn.disabled = true; btn.innerText = "Guardando...";
     
     const datos = {
         op: 'administrarPreceptor',
         accion: document.getElementById('accion_preceptor').value,
-        dni: document.getElementById('preceptor_dni').value,
-        nombre: document.getElementById('preceptor_nombre').value,
-        email: document.getElementById('preceptor_email').value,
-        celular: document.getElementById('preceptor_celular').value,
-        dniOriginal: document.getElementById('preceptor_dni_orig').value,
-        emailOriginal: document.getElementById('preceptor_email_orig').value
+        dniOriginal: document.getElementById('dni_original_preceptor').value,
+        dni: document.getElementById('prec_dni').value,
+        nombre: document.getElementById('prec_nombre').value,
+        email: document.getElementById('prec_email').value,
+        celular: document.getElementById('prec_celular').value
     };
-    
+
     try {
-        const response = await fetch(URL_API, { 
-            method: 'POST', 
-            body: JSON.stringify(datos) 
-        });
+        const resp = await fetch(URL_API, { method: 'POST', body: JSON.stringify(datos) });
+        const json = await resp.json();
         
-        const result = await response.json();
-        
-        if (result.status === 'success') {
-            const modalEl = document.getElementById('modalPreceptor');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) {
-                modal.hide();
-            }
-            alert("✅ Preceptor guardado correctamente");
-            verPreceptores(); // Recargar la vista
+        if(json.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('modalPreceptor')).hide();
+            alert("Preceptor guardado correctamente.");
+            verPreceptores(); // Recargar tabla
         } else {
-            throw new Error(result.message || 'Error al guardar');
+            alert("Error: " + json.message);
         }
-        
     } catch (e) {
-        alert("Error al guardar: " + e.message);
+        alert("Error de conexión al guardar.");
     } finally {
-        btn.disabled = false;
-        btn.innerText = "Guardar";
+        btn.disabled = false; btn.innerText = "Guardar";
     }
 }
 
 async function borrarPreceptor(dni, email) {
-    if (!confirm(`¿Seguro que deseas eliminar al preceptor con DNI ${dni}?`)) return;
+    if(!confirm(`¿Seguro que deseas eliminar al preceptor DNI ${dni}?`)) return;
     
     try {
-        const response = await fetch(URL_API, { 
+        await fetch(URL_API, { 
             method: 'POST', 
-            body: JSON.stringify({ 
-                op: 'administrarPreceptor', 
-                accion: 'borrar', 
-                dni: dni, 
-                email: email 
-            }) 
+            body: JSON.stringify({ op: 'administrarPreceptor', accion: 'borrar', dni: dni }) 
         });
-        
-        const result = await response.json();
-        
-        if (result.status === 'success') {
-            alert("✅ Preceptor eliminado correctamente");
-            verPreceptores(); // Recargar la vista
-        } else {
-            throw new Error(result.message || 'Error al eliminar');
-        }
-        
+        alert("Eliminado.");
+        verPreceptores();
     } catch (e) {
-        alert("Error al eliminar: " + e.message);
+        alert("Error al eliminar.");
     }
 }
 
-// MODAL PARA ASIGNAR CURSOS
-async function abrirModalAsignarCursos(index) {
-    const filas = document.querySelectorAll('#tbodyPreceptores tr.fila-preceptor');
-    const fila = filas[index];
+// --- ASIGNACIÓN DE CURSOS ---
+
+async function abrirModalCursosPreceptor(index) {
+    const p = baseDatosPreceptores[index];
+    const modal = new bootstrap.Modal(document.getElementById('modalCursosPreceptor'));
     
-    const dni = fila.dataset.dni;
-    const nombre = fila.querySelector('td:nth-child(2)').textContent.trim();
-    const cursosActuales = fila.dataset.cursos;
+    document.getElementById('tituloModalCursos').innerText = `Cursos de: ${p.nombre}`;
+    document.getElementById('dni_curso_preceptor').value = p.dni;
     
-    document.getElementById('asignar_preceptor_dni').value = dni;
-    document.getElementById('asignar_preceptor_nombre').value = nombre;
-    document.getElementById('span_nombre_preceptor').innerText = nombre;
-    
-    // Cargar cursos disponibles desde Materias
     const select = document.getElementById('cursos_disponibles');
     select.innerHTML = '<option>Cargando cursos...</option>';
     
-    const modalEl = document.getElementById('modalAsignarCursos');
-    if (modalEl) {
-        new bootstrap.Modal(modalEl).show();
-    }
+    modal.show();
     
     try {
+        // Obtenemos cursos disponibles desde el backend
         const resp = await fetch(`${URL_API}?op=getCursosDisponibles&rol=Directivo`);
         const json = await resp.json();
         
-        if (json.status !== 'success') {
-            select.innerHTML = `<option>Error al cargar cursos: ${json.message || 'Error desconocido'}</option>`;
-            return;
-        }
-        
-        if (json.data.length === 0) {
-            select.innerHTML = '<option>No hay cursos disponibles</option>';
-            return;
-        }
-        
-        let html = '';
-        const cursosArray = cursosActuales ? cursosActuales.split(',').map(c => c.trim()) : [];
+        select.innerHTML = '';
+        const cursosAsignados = p.cursos ? p.cursos.split(', ').map(c => c.trim()) : [];
         
         json.data.forEach(curso => {
-            const cursoTrimmed = curso.trim();
-            const selected = cursosArray.some(c => c.toLowerCase() === cursoTrimmed.toLowerCase()) ? 'selected' : '';
-            const displayText = `${cursoTrimmed}`;
-            
-            html += `<option value="${cursoTrimmed}" ${selected}>${displayText}</option>`;
+            const selected = cursosAsignados.includes(curso) ? 'selected' : '';
+            select.innerHTML += `<option value="${curso}" ${selected}>${curso}</option>`;
         });
         
-        select.innerHTML = html;
-        
-        // Hacerlo selección múltiple
-        select.setAttribute('multiple', 'multiple');
-        select.size = Math.min(10, json.data.length);
-        
-        // Cargar información adicional de los cursos
-        cargarInfoCursosAdicional(json.data, cursosArray);
-        
     } catch (e) {
-        console.error('Error cargando cursos:', e);
-        select.innerHTML = '<option>Error al cargar cursos. Intenta nuevamente.</option>';
-    }
-}
-
-// NUEVA FUNCIÓN: CARGAR INFORMACIÓN ADICIONAL DE CURSOS
-async function cargarInfoCursosAdicional(cursosDisponibles, cursosAsignados) {
-    try {
-        const resp = await fetch(`${URL_API}?op=getInfoCursos&rol=Directivo`);
-        const json = await resp.json();
-        
-        if (json.status === 'success') {
-            const container = document.getElementById('infoCursosContainer');
-            if (container) {
-                let html = '<h6 class="mt-3 mb-2">📊 Información de Cursos</h6>';
-                html += '<div class="accordion" id="accordionCursos">';
-                
-                json.data.forEach((curso, index) => {
-                    const isAssigned = cursosAsignados.some(c => c.toLowerCase() === curso.nombre.toLowerCase());
-                    const badgeClass = isAssigned ? 'bg-success' : 'bg-secondary';
-                    
-                    html += `
-                        <div class="accordion-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
-                                        data-bs-target="#collapse${index}" aria-expanded="false" aria-controls="collapse${index}">
-                                    <span class="badge ${badgeClass} me-2">${isAssigned ? '✓' : '○'}</span>
-                                    ${curso.nombre}
-                                    <small class="text-muted ms-2">(${curso.totalMaterias} materias)</small>
-                                </button>
-                            </h2>
-                            <div id="collapse${index}" class="accordion-collapse collapse" data-bs-parent="#accordionCursos">
-                                <div class="accordion-body">
-                                    ${curso.tienePreceptor ? 
-                                        `<p><strong>Preceptor actual:</strong> ${curso.preceptores.join(', ')}</p>` : 
-                                        '<p class="text-warning">⚠️ Sin preceptor asignado</p>'
-                                    }
-                                    <p><strong>Materias:</strong></p>
-                                    <ul class="list-unstyled">
-                                        ${curso.materias.map(m => 
-                                            `<li class="mb-1">
-                                                <span class="badge bg-info me-1">${m.nombre}</span>
-                                                <small>${m.docente || 'Sin docente'}</small>
-                                            </li>`
-                                        ).join('')}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>`;
-                });
-                
-                html += '</div>';
-                container.innerHTML = html;
-            }
-        }
-    } catch (e) {
-        console.log('No se pudo cargar información adicional de cursos:', e);
+        select.innerHTML = '<option>Error al cargar cursos</option>';
     }
 }
 
 async function guardarAsignacionCursos() {
-    const btn = document.getElementById('btnGuardarCursos');
-    btn.disabled = true;
-    btn.innerText = "Asignando...";
-    
+    const dni = document.getElementById('dni_curso_preceptor').value;
     const select = document.getElementById('cursos_disponibles');
-    const cursosSeleccionados = Array.from(select.selectedOptions).map(option => option.value);
+    // Obtener valores múltiples seleccionados
+    const seleccionados = Array.from(select.selectedOptions).map(option => option.value);
     
-    const datos = {
-        op: 'asignarCursosPreceptor',
-        dniPreceptor: document.getElementById('asignar_preceptor_dni').value,
-        cursos: cursosSeleccionados
-    };
+    const btn = document.getElementById('btnGuardarCursos');
+    btn.disabled = true; btn.innerText = "Guardando...";
     
     try {
-        const response = await fetch(URL_API, { 
-            method: 'POST', 
-            body: JSON.stringify(datos) 
+        const resp = await fetch(URL_API, {
+            method: 'POST',
+            body: JSON.stringify({
+                op: 'asignarCursosPreceptor',
+                dniPreceptor: dni,
+                cursos: seleccionados
+            })
         });
         
-        const result = await response.json();
-        
-        if (result.status === 'success') {
-            const modalEl = document.getElementById('modalAsignarCursos');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) {
-                modal.hide();
-            }
-            alert("✅ Cursos asignados correctamente");
-            verPreceptores(); // Recargar la vista
-        } else {
-            throw new Error(result.message || 'Error al asignar cursos');
-        }
+        bootstrap.Modal.getInstance(document.getElementById('modalCursosPreceptor')).hide();
+        alert("Cursos asignados correctamente.");
+        verPreceptores();
         
     } catch (e) {
-        alert("Error al asignar cursos: " + e.message);
+        alert("Error al guardar cursos.");
     } finally {
-        btn.disabled = false;
-        btn.innerText = "Guardar Asignación";
+        btn.disabled = false; btn.innerText = "💾 Guardar Asignación de Cursos";
     }
 }
 
-// MODALES HTML
+// --- RENDERIZADO DE MODALES (HTML) ---
+
 function renderModalPreceptorHTML() {
     return `
     <div class="modal fade" id="modalPreceptor" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
-          <div class="modal-header bg-info text-white">
-            <h5 class="modal-title" id="modalTitlePreceptor">Preceptor</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title" id="tituloModalPreceptor">Nuevo Preceptor</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
             <form id="formPreceptor">
                 <input type="hidden" id="accion_preceptor">
-                <input type="hidden" id="preceptor_dni_orig">
-                <input type="hidden" id="preceptor_email_orig">
+                <input type="hidden" id="dni_original_preceptor">
                 
                 <div class="mb-3">
-                    <label class="form-label">DNI</label>
-                    <input type="number" id="preceptor_dni" class="form-control" required>
+                    <label>DNI</label>
+                    <input type="number" class="form-control" id="prec_dni" required>
                 </div>
-                
                 <div class="mb-3">
-                    <label class="form-label">Nombre Completo</label>
-                    <input type="text" id="preceptor_nombre" class="form-control" required>
+                    <label>Nombre y Apellido</label>
+                    <input type="text" class="form-control" id="prec_nombre" required>
                 </div>
-                
                 <div class="mb-3">
-                    <label class="form-label">Email ABC</label>
-                    <input type="email" id="preceptor_email" class="form-control" required>
+                    <label>Email ABC</label>
+                    <input type="email" class="form-control" id="prec_email">
                 </div>
-                
                 <div class="mb-3">
-                    <label class="form-label">Celular</label>
-                    <input type="text" id="preceptor_celular" class="form-control" placeholder="Ej: 1134567890">
+                    <label>Celular</label>
+                    <input type="text" class="form-control" id="prec_celular">
                 </div>
             </form>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="button" class="btn btn-info" id="btnGuardarPreceptor" onclick="guardarPreceptor()">Guardar</button>
+            <button type="button" class="btn btn-success" id="btnGuardarPreceptor" onclick="guardarPreceptor()">Guardar</button>
           </div>
         </div>
       </div>
     </div>`;
 }
 
-function renderModalAsignarCursosHTML() {
+function renderModalCursosPreceptorHTML() {
     return `
-    <div class="modal fade" id="modalAsignarCursos" tabindex="-1">
-      <div class="modal-dialog modal-lg">
+    <div class="modal fade" id="modalCursosPreceptor" tabindex="-1">
+      <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header bg-warning">
-            <h5 class="modal-title text-dark">Asignar Cursos a Preceptor</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <h5 class="modal-title" id="tituloModalCursos">Asignar Cursos</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <div class="row">
-              <div class="col-md-6">
-                <p>Preceptor: <b><span id="span_nombre_preceptor"></span></b></p>
-                <input type="hidden" id="asignar_preceptor_dni">
-                <input type="hidden" id="asignar_preceptor_nombre">
-                
-                <div class="mb-3">
-                    <label class="form-label">Seleccionar Cursos:</label>
-                    <select id="cursos_disponibles" class="form-select" multiple>
-                        <!-- Los cursos se cargarán dinámicamente -->
-                    </select>
-                    <div class="form-text">
-                        <small>Mantén presionada la tecla Ctrl (Cmd en Mac) para seleccionar múltiples cursos.</small>
-                    </div>
-                </div>
-                
-                <div class="d-grid">
-                  <button type="button" class="btn btn-warning" id="btnGuardarCursos" onclick="guardarAsignacionCursos()">
-                    💾 Guardar Asignación de Cursos
-                  </button>
-                </div>
-              </div>
-              
-              <div class="col-md-6">
-                <div id="infoCursosContainer" style="max-height: 400px; overflow-y: auto;">
-                  <!-- Aquí se cargará la información de los cursos -->
-                </div>
-              </div>
+            <input type="hidden" id="dni_curso_preceptor">
+            <div class="alert alert-info small">
+                Mantén presionada la tecla <b>Ctrl</b> (o Cmd) para seleccionar múltiples cursos a la vez.
             </div>
-            
-            <div class="alert alert-info mt-3">
-              <small>
-                <strong>💡 Consejo:</strong> Puedes asignar múltiples cursos al mismo preceptor. 
-                Los cursos se obtienen de la pestaña "Materias" (columna D).
-              </small>
+            <div class="mb-3">
+                <label>Seleccionar Cursos:</label>
+                <select id="cursos_disponibles" class="form-select" multiple size="8">
+                    </select>
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-dark" id="btnGuardarCursos" onclick="guardarAsignacionCursos()">💾 Guardar Asignación de Cursos</button>
           </div>
         </div>
       </div>
