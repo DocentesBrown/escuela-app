@@ -59,7 +59,7 @@ function cargarDashboard(user) {
         menu.innerHTML += `
             <button class="list-group-item list-group-item-action" onclick="verEstudiantes()">👥 Gestión Estudiantes</button>
             <button class="list-group-item list-group-item-action" onclick="verDocentes()">🎓 Gestión Docentes</button>
-            <button class="list-group-item list-group-item-action bg-info text-white" onclick="verPreceptores()">👨‍🏫 Gestión Preceptores</button>
+            <button class="list-group-item list-group-item-action" onclick="verPreceptores()">👨‍🏫 Gestión Preceptores</button>
         `;
     }
 
@@ -2496,5 +2496,6 @@ function renderModalAsignarCursosHTML() {
       </div>
     </div>`;
 }
+
 
 
