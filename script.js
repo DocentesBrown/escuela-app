@@ -2604,5 +2604,3 @@ function renderModalAsignarCursosHTML() {
       </div>
     </div>`;
 }
-
-
