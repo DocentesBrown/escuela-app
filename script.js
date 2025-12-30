@@ -746,42 +746,139 @@ async function borrarDocente(dni, email) {
 // 4. MÓDULO PRECEPTOR MEJORADO (CON FECHA Y E.F.)
 // ==========================================
 
+// ==========================================
+// LÓGICA DEL PRECEPTOR (DASHBOARD MEJORADO)
+// ==========================================
+
 async function iniciarModuloPreceptor() {
-    document.getElementById('contenido-dinamico').innerHTML = `<div class="spinner-border spinner-border-sm"></div> Cargando datos y estadísticas...`;
+    const contenedor = document.getElementById('contenido-dinamico');
+    
+    // Mostramos mensaje de bienvenida y spinner de carga
+    contenedor.innerHTML = `
+        <div class="mb-4">
+            <h3>Hola, ${usuarioActual.nombre} 👋</h3>
+            <p class="text-muted">Selecciona un curso para gestionar la asistencia.</p>
+        </div>
+        <div id="lista-cursos-preceptor" class="row g-3">
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2">Cargando cursos disponibles...</p>
+            </div>
+        </div>
+    `;
+
+    try {
+        // 1. Pedimos TODOS los cursos disponibles al sistema (usando el rol Preceptor)
+        const resp = await fetch(`${URL_API}?op=getCursosDisponibles&rol=Preceptor`);
+        const json = await resp.json();
+        
+        const divCursos = document.getElementById('lista-cursos-preceptor');
+        divCursos.innerHTML = ''; // Limpiamos el spinner
+
+        if (json.status === 'success' && json.data && json.data.length > 0) {
+            
+            // 2. Obtenemos los cursos asignados al usuario (vienen del Login actualizado)
+            // Si usuarioActual.cursos es "1A, 2B", esto crea el array ['1A', '2B']
+            const misCursosStr = usuarioActual.cursos || ""; 
+            const misCursos = misCursosStr.split(',').map(c => c.trim());
+
+            // 3. Separamos los cursos en dos grupos
+            const cursosPropios = [];
+            const otrosCursos = [];
+
+            json.data.forEach(curso => {
+                if (misCursos.includes(curso)) {
+                    cursosPropios.push(curso);
+                } else {
+                    otrosCursos.push(curso);
+                }
+            });
+
+            // 4. Renderizamos primero MIS CURSOS (Destacados en Azul)
+            if (cursosPropios.length > 0) {
+                divCursos.innerHTML += `
+                    <div class="col-12 mt-2">
+                        <h6 class="text-primary fw-bold border-bottom pb-2">
+                            ⭐ Mis Cursos Asignados
+                        </h6>
+                    </div>`;
+                
+                cursosPropios.forEach(curso => {
+                    divCursos.innerHTML += `
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <button class="btn btn-primary w-100 py-4 shadow-sm fw-bold fs-5 position-relative" onclick="cargarAsistencia('${curso}')">
+                                ${curso}
+                                <span class="position-absolute top-0 start-100 translate-middle p-2 bg-warning border border-light rounded-circle">
+                                    <span class="visually-hidden">Asignado</span>
+                                </span>
+                            </button>
+                        </div>`;
+                });
+            }
+
+            // 5. Renderizamos el RESTO de cursos (Secundarios en Gris)
+            if (otrosCursos.length > 0) {
+                // Si hay cursos propios, ponemos un separador visual
+                if (cursosPropios.length > 0) {
+                    divCursos.innerHTML += `
+                        <div class="col-12 mt-5">
+                            <h6 class="text-muted border-bottom pb-2">
+                                📂 Otros Cursos del Colegio
+                            </h6>
+                        </div>`;
+                }
+
+                otrosCursos.forEach(curso => {
+                    divCursos.innerHTML += `
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <button class="btn btn-outline-secondary w-100 py-2" onclick="cargarAsistencia('${curso}')">
+                                ${curso}
+                            </button>
+                        </div>`;
+                });
+            }
+
+        } else {
+            divCursos.innerHTML = '<div class="alert alert-warning">No se encontraron cursos en el sistema.</div>';
+        }
+
+    } catch (e) {
+        console.error(e);
+        document.getElementById('lista-cursos-preceptor').innerHTML = 
+            `<div class="alert alert-danger">Error al cargar los cursos: ${e.message}</div>`;
+    }
+}
+
+// Función auxiliar para el botón "Contactar Docentes" del menú
+async function verContactosDocentes() {
+    const contenedor = document.getElementById('contenido-dinamico');
+    contenedor.innerHTML = '<div class="spinner-border text-info"></div> Cargando directorio docente...';
     
     try {
-        const resp = await fetch(`${URL_API}?op=getDataPreceptor&rol=Preceptor`);
+        const resp = await fetch(`${URL_API}?op=getDocentes&rol=Preceptor`);
         const json = await resp.json();
-        baseDatosAlumnos = json.data; 
         
-        const cursos = [...new Set(baseDatosAlumnos.map(obj => obj.data[2]))].sort();
-        let opts = cursos.map(c => `<option value="${c}">${c}</option>`).join('');
+        let html = `<h3>📞 Directorio Docente</h3>
+                    <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead><tr><th>Nombre</th><th>Materia(s)</th><th>Email</th><th>Celular</th></tr></thead>
+                        <tbody>`;
         
-        // FECHA DE HOY POR DEFECTO
-        const hoy = new Date().toISOString().split('T')[0];
-
-        document.getElementById('contenido-dinamico').innerHTML = `
-            <div class="card p-3 shadow-sm mb-3">
-                <h5>📅 Control de Asistencia</h5>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Seleccionar Curso</label>
-                        <select id="selCurso" class="form-select form-select-lg" onchange="renderTablaPreceptor()">
-                            <option selected disabled>Elige un Curso</option>${opts}
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Fecha de la Falta</label>
-                        <input type="date" id="fechaAsistencia" class="form-control form-select-lg" value="${hoy}">
-                    </div>
-                </div>
-            </div>
-            <div id="zonaPreceptor"></div>
-            ${renderModalJustificacionHTML()}
-            `;
-    } catch(e) {
-        console.log(e);
-        document.getElementById('contenido-dinamico').innerHTML = `<div class="alert alert-danger">Error de conexión.</div>`;
+        // Asumiendo que getDocentes devuelve array de arrays [dni, nombre, email, celular, materias]
+        json.data.forEach(d => {
+            html += `<tr>
+                        <td>${d[1]}</td>
+                        <td><small>${d[4] || '-'}</small></td>
+                        <td><a href="mailto:${d[2]}">${d[2]}</a></td>
+                        <td><a href="https://wa.me/549${d[3]}" target="_blank">${d[3]}</a></td>
+                     </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+        contenedor.innerHTML = html;
+        
+    } catch (e) {
+        contenedor.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
     }
 }
 
@@ -2055,9 +2152,6 @@ function calcularNotaIndividual(dni) {
     }
 }
 
-// ==========================================
-// 7. MÓDULO GESTIÓN DE PRECEPTORES (DIRECTIVO) - PESTAÑA SEPARADA
-// ==========================================
 
 // ==========================================
 // 4. MÓDULO DIRECTIVO: PRECEPTORES (CORREGIDO)
@@ -2341,3 +2435,4 @@ function renderModalCursosPreceptorHTML() {
       </div>
     </div>`;
 }
+
