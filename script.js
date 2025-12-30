@@ -61,6 +61,7 @@ function cargarDashboard(user) {
             <button class="list-group-item list-group-item-action" onclick="verDocentes()">🎓 Gestión Docentes</button>
             <button class="list-group-item list-group-item-action" onclick="verPreceptores()">👨‍🏫 Gestión Preceptores</button>
         `;
+        iniciarModuloDirectivo();
     }
 
     // --- MENÚ PRECEPTOR ---
@@ -1267,46 +1268,6 @@ function renderModalAsignacionCompletaHTML() {
 // ==========================================
 // 6. MÓDULO DOCENTE COMPLETO
 // ==========================================
-
-// En la función cargarDashboard, agrega el menú para Docente:
-function cargarDashboard(user) {
-    document.getElementById('login-screen').classList.add('d-none');
-    document.getElementById('dashboard-screen').classList.remove('d-none');
-    document.getElementById('user-name').innerText = `${user.nombre} (${user.rol})`;
-
-    const menu = document.getElementById('menu-lateral');
-    menu.innerHTML = '';
-    const rol = String(user.rol).trim().toLowerCase(); 
-
-    // --- MENÚ DIRECTIVO ---
-    if (rol === 'directivo') {
-        menu.innerHTML += `
-            <button class="list-group-item list-group-item-action" onclick="verEstudiantes()">👥 Gestión Estudiantes</button>
-            <button class="list-group-item list-group-item-action" onclick="verDocentes()">🎓 Gestión Docentes</button>
-        `;
-    }
-
-    // --- MENÚ PRECEPTOR ---
-    if (rol === 'preceptor') {
-        menu.innerHTML += `
-            <button class="list-group-item list-group-item-action" onclick="iniciarModuloPreceptor()">📝 Tomar Asistencia</button>
-            <button class="list-group-item list-group-item-action bg-info text-white" onclick="verContactosDocentes()">📞 Contactar Docentes</button>
-        `;
-        iniciarModuloPreceptor(); 
-    }
-
-    // --- NUEVO: MENÚ DOCENTE ---
-    if (rol === 'docente') {
-        menu.innerHTML += `
-            <button class="list-group-item list-group-item-action bg-primary text-white" onclick="iniciarModuloDocente()">🏫 Mis Cursos</button>
-            <button class="list-group-item list-group-item-action" onclick="verMisDatosDocente()">👤 Mis Datos</button>
-        `;
-        iniciarModuloDocente();
-    }
-
-    // --- BOTÓN SALIR ---
-    menu.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Cerrar Sesión</button>`;
-}
 
 // --- MÓDULO PRINCIPAL DOCENTE ---
 
@@ -2549,3 +2510,4 @@ function renderModalAsignarCursosHTML() {
       </div>
     </div>`;
 }
+
