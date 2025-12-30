@@ -73,6 +73,15 @@ function cargarDashboard(user) {
         iniciarModuloPreceptor(); 
     }
 
+    // --- NUEVO: MENÚ DOCENTE ---
+    if (rol === 'docente') {
+        menu.innerHTML += `
+            <button class="list-group-item list-group-item-action bg-primary text-white" onclick="iniciarModuloDocente()">🏫 Mis Cursos</button>
+            <button class="list-group-item list-group-item-action" onclick="verMisDatosDocente()">👤 Mis Datos</button>
+        `;
+        iniciarModuloDocente();
+    }
+    
     // --- BOTÓN SALIR ---
     menu.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Cerrar Sesión</button>`;
 }
@@ -2496,6 +2505,7 @@ function renderModalAsignarCursosHTML() {
       </div>
     </div>`;
 }
+
 
 
 
