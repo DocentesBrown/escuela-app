@@ -2130,32 +2130,39 @@ async function verPreceptores() {
             
             let cursosHTML = cursos || 'Sin cursos asignados';
             if (cursosHTML && cursosHTML !== 'Sin cursos asignados') {
-                cursosHTML = cursosHTML.split(', ').map(curso => 
-                    `<span class="badge bg-primary me-1 mb-1">${curso}</span>`
+                const cursosArray = cursosHTML.split(', ');
+                cursosHTML = cursosArray.map(curso => 
+                    `<span class="badge bg-primary me-1 mb-1" style="font-size: 0.8em">${curso}</span>`
                 ).join('');
             }
             
-            html += `
-                <tr class="fila-preceptor" 
-                    data-dni="${dni}" 
-                    data-nombre="${nombre.toLowerCase()}" 
-                    data-email="${email.toLowerCase()}" 
-                    data-cursos="${cursos.toLowerCase()}">
-                    <td>${dni}</td>
-                    <td class="fw-bold">${nombre}</td>
-                    <td>
-                        <small>
-                            <a href="mailto:${email}">${email}</a><br>
-                            ${celular || 'Sin teléfono'}
-                        </small>
-                    </td>
-                    <td><small>${cursosHTML}</small></td>
-                    <td class="text-center" style="width: 180px;">
-                        <button class="btn btn-sm btn-outline-warning me-1" onclick="abrirModalAsignarCursos(${index})" title="Asignar Cursos">🏫</button>
-                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editarPreceptor(${index})" title="Editar">✏️</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="borrarPreceptor('${dni}', '${email}')" title="Borrar">🗑️</button>
-                    </td>
-                </tr>`;
+        html += `
+            <tr class="fila-preceptor" 
+                data-dni="${dni}" 
+                data-nombre="${nombre.toLowerCase()}" 
+                data-email="${email.toLowerCase()}" 
+                data-cursos="${cursos.toLowerCase()}"
+                title="${tooltipText}">
+                <td>${dni}</td>
+                <td class="fw-bold">${nombre}</td>
+                <td>
+                    <small>
+                        <a href="mailto:${email}">${email}</a><br>
+                        ${celular || 'Sin teléfono'}
+                    </small>
+                </td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        ${contadorCursos > 0 ? `<span class="badge bg-info me-2">${contadorCursos}</span>` : ''}
+                        <small>${cursosHTML}</small>
+                    </div>
+                </td>
+                <td class="text-center" style="width: 180px;">
+                    <button class="btn btn-sm btn-outline-warning me-1" onclick="abrirModalAsignarCursos(${index})" title="Asignar Cursos">🏫</button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editarPreceptor(${index})" title="Editar">✏️</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="borrarPreceptor('${dni}', '${email}')" title="Borrar">🗑️</button>
+                </td>
+            </tr>`;
         });
         
         html += `</tbody></table></div>`;
@@ -2351,7 +2358,7 @@ async function abrirModalAsignarCursos(index) {
     document.getElementById('asignar_preceptor_nombre').value = nombre;
     document.getElementById('span_nombre_preceptor').innerText = nombre;
     
-    // Cargar cursos disponibles
+    // Cargar cursos disponibles desde Materias
     const select = document.getElementById('cursos_disponibles');
     select.innerHTML = '<option>Cargando cursos...</option>';
     
@@ -2365,28 +2372,93 @@ async function abrirModalAsignarCursos(index) {
         const json = await resp.json();
         
         if (json.status !== 'success') {
-            select.innerHTML = '<option>Error al cargar cursos</option>';
+            select.innerHTML = `<option>Error al cargar cursos: ${json.message || 'Error desconocido'}</option>`;
+            return;
+        }
+        
+        if (json.data.length === 0) {
+            select.innerHTML = '<option>No hay cursos disponibles</option>';
             return;
         }
         
         let html = '';
-        const cursosArray = cursosActuales ? cursosActuales.split(',') : [];
+        const cursosArray = cursosActuales ? cursosActuales.split(',').map(c => c.trim()) : [];
         
         json.data.forEach(curso => {
             const cursoTrimmed = curso.trim();
-            const selected = cursosArray.some(c => c.trim().toLowerCase() === cursoTrimmed.toLowerCase()) ? 'selected' : '';
-            html += `<option value="${cursoTrimmed}" ${selected}>${cursoTrimmed}</option>`;
+            const selected = cursosArray.some(c => c.toLowerCase() === cursoTrimmed.toLowerCase()) ? 'selected' : '';
+            const displayText = `${cursoTrimmed}`;
+            
+            html += `<option value="${cursoTrimmed}" ${selected}>${displayText}</option>`;
         });
         
         select.innerHTML = html;
         
         // Hacerlo selección múltiple
         select.setAttribute('multiple', 'multiple');
-        select.size = Math.min(8, json.data.length);
+        select.size = Math.min(10, json.data.length);
+        
+        // Cargar información adicional de los cursos
+        cargarInfoCursosAdicional(json.data, cursosArray);
         
     } catch (e) {
         console.error('Error cargando cursos:', e);
-        select.innerHTML = '<option>Error al cargar cursos</option>';
+        select.innerHTML = '<option>Error al cargar cursos. Intenta nuevamente.</option>';
+    }
+}
+
+// NUEVA FUNCIÓN: CARGAR INFORMACIÓN ADICIONAL DE CURSOS
+async function cargarInfoCursosAdicional(cursosDisponibles, cursosAsignados) {
+    try {
+        const resp = await fetch(`${URL_API}?op=getInfoCursos&rol=Directivo`);
+        const json = await resp.json();
+        
+        if (json.status === 'success') {
+            const container = document.getElementById('infoCursosContainer');
+            if (container) {
+                let html = '<h6 class="mt-3 mb-2">📊 Información de Cursos</h6>';
+                html += '<div class="accordion" id="accordionCursos">';
+                
+                json.data.forEach((curso, index) => {
+                    const isAssigned = cursosAsignados.some(c => c.toLowerCase() === curso.nombre.toLowerCase());
+                    const badgeClass = isAssigned ? 'bg-success' : 'bg-secondary';
+                    
+                    html += `
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                        data-bs-target="#collapse${index}" aria-expanded="false" aria-controls="collapse${index}">
+                                    <span class="badge ${badgeClass} me-2">${isAssigned ? '✓' : '○'}</span>
+                                    ${curso.nombre}
+                                    <small class="text-muted ms-2">(${curso.totalMaterias} materias)</small>
+                                </button>
+                            </h2>
+                            <div id="collapse${index}" class="accordion-collapse collapse" data-bs-parent="#accordionCursos">
+                                <div class="accordion-body">
+                                    ${curso.tienePreceptor ? 
+                                        `<p><strong>Preceptor actual:</strong> ${curso.preceptores.join(', ')}</p>` : 
+                                        '<p class="text-warning">⚠️ Sin preceptor asignado</p>'
+                                    }
+                                    <p><strong>Materias:</strong></p>
+                                    <ul class="list-unstyled">
+                                        ${curso.materias.map(m => 
+                                            `<li class="mb-1">
+                                                <span class="badge bg-info me-1">${m.nombre}</span>
+                                                <small>${m.docente || 'Sin docente'}</small>
+                                            </li>`
+                                        ).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                
+                html += '</div>';
+                container.innerHTML = html;
+            }
+        }
+    } catch (e) {
+        console.log('No se pudo cargar información adicional de cursos:', e);
     }
 }
 
@@ -2481,33 +2553,56 @@ function renderModalPreceptorHTML() {
 function renderModalAsignarCursosHTML() {
     return `
     <div class="modal fade" id="modalAsignarCursos" tabindex="-1">
-      <div class="modal-dialog">
+      <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header bg-warning">
             <h5 class="modal-title text-dark">Asignar Cursos a Preceptor</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <p>Preceptor: <b><span id="span_nombre_preceptor"></span></b></p>
-            <input type="hidden" id="asignar_preceptor_dni">
-            <input type="hidden" id="asignar_preceptor_nombre">
-            
-            <div class="mb-3">
-                <label class="form-label">Seleccionar Cursos:</label>
-                <select id="cursos_disponibles" class="form-select" multiple>
-                    <!-- Los cursos se cargarán dinámicamente -->
-                </select>
-                <div class="form-text">
-                    <small>Mantén presionada la tecla Ctrl (Cmd en Mac) para seleccionar múltiples cursos.</small>
+            <div class="row">
+              <div class="col-md-6">
+                <p>Preceptor: <b><span id="span_nombre_preceptor"></span></b></p>
+                <input type="hidden" id="asignar_preceptor_dni">
+                <input type="hidden" id="asignar_preceptor_nombre">
+                
+                <div class="mb-3">
+                    <label class="form-label">Seleccionar Cursos:</label>
+                    <select id="cursos_disponibles" class="form-select" multiple>
+                        <!-- Los cursos se cargarán dinámicamente -->
+                    </select>
+                    <div class="form-text">
+                        <small>Mantén presionada la tecla Ctrl (Cmd en Mac) para seleccionar múltiples cursos.</small>
+                    </div>
                 </div>
+                
+                <div class="d-grid">
+                  <button type="button" class="btn btn-warning" id="btnGuardarCursos" onclick="guardarAsignacionCursos()">
+                    💾 Guardar Asignación de Cursos
+                  </button>
+                </div>
+              </div>
+              
+              <div class="col-md-6">
+                <div id="infoCursosContainer" style="max-height: 400px; overflow-y: auto;">
+                  <!-- Aquí se cargará la información de los cursos -->
+                </div>
+              </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+              <small>
+                <strong>💡 Consejo:</strong> Puedes asignar múltiples cursos al mismo preceptor. 
+                Los cursos se obtienen de la pestaña "Materias" (columna D).
+              </small>
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="button" class="btn btn-warning" id="btnGuardarCursos" onclick="guardarAsignacionCursos()">Guardar Asignación</button>
           </div>
         </div>
       </div>
     </div>`;
 }
+
 
