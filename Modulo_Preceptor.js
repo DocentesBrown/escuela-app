@@ -56,11 +56,31 @@ async function cargarAsistencia(curso) {
 }
 
 function renderTablaPreceptor() {
-    const curso = document.getElementById('selCurso').value;
-    const lista = baseDatosAlumnos.filter(obj => String(obj.data[2]) === curso).sort((a,b) => String(a.data[1]).localeCompare(b.data[1]));
+    const cursoSeleccionado = document.getElementById('selCurso').value;
+    
+    // Normalizamos el curso seleccionado (quitamos espacios extra)
+    const cursoClean = String(cursoSeleccionado).trim().toUpperCase();
+
+    // Filtramos alumnos comparando texto limpio
+    // obj.data[2] es la columna CURSO que viene del Excel
+    const lista = baseDatosAlumnos.filter(obj => {
+        const cursoAlumno = String(obj.data[2] || "").trim().toUpperCase();
+        return cursoAlumno === cursoClean;
+    });
+
+    // Ordenamos alfabéticamente
+    lista.sort((a,b) => String(a.data[1]).localeCompare(b.data[1]));
     
     if(lista.length === 0) {
-        document.getElementById('zonaPreceptor').innerHTML = '<div class="alert alert-warning">No hay alumnos.</div>';
+        document.getElementById('zonaPreceptor').innerHTML = `
+            <div class="alert alert-warning text-center">
+                <h5>⚠️ No se encontraron alumnos en ${cursoSeleccionado}</h5>
+                <p class="mb-0 small">Posibles causas:</p>
+                <ul class="text-start d-inline-block small text-muted">
+                    <li>El Directivo aún no asignó el curso en la "Gestión de Estudiantes".</li>
+                    <li>El nombre del curso tiene un error de escritura.</li>
+                </ul>
+            </div>`;
         return;
     }
 
@@ -71,6 +91,8 @@ function renderTablaPreceptor() {
     lista.forEach(item => {
         const alu = item.data; 
         const st = item.stats; 
+        
+        // Formato de faltas
         let total = parseFloat(st.total);
         let totalStr = Number.isInteger(total) ? total : total.toFixed(2).replace('.00','');
         let alerta = total >= 10 ? `<span class="badge bg-danger ms-2">⚠️ ${totalStr}</span>` : (total > 0 ? `<span class="badge bg-light text-dark border ms-2">${totalStr}</span>` : "");
