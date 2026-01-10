@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plataforma Escolar</title>
+    <title>Plataforma Escolar | Docentes Brown</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -31,8 +31,8 @@
         <nav class="navbar navbar-dark bg-dark">
             <div class="container-fluid">
                 <span class="navbar-brand mb-0 h1">Hola, <span id="user-name">Usuario</span></span>
-                <!-- En la sección del dashboard, cambia el botón de salir por esto: -->
-                <button onclick="location.reload()" class="btn btn-outline-light btn-sm">Salir</button>            </div>
+                <button onclick="location.reload()" class="btn btn-outline-light btn-sm">Salir</button>            
+            </div>
         </nav>
 
         <div class="container mt-4">
@@ -45,19 +45,27 @@
                 <div class="col-md-9">
                     <div class="card p-4">
                         <h4 id="titulo-seccion">Bienvenido</h4>
-                        <p>Selecciona una opción del menú.</p>
-                        <div id="contenido-dinamico">
-                            </div>
+                        <p class="text-muted small mb-4">Selecciona una opción del menú para comenzar.</p>
+                        
+                        <div id="contenido-dinamico"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-<script src="script.js"></script>
+    <script src="Core.js"></script>
+
+    <script src="Templates.js"></script>
+
+    <script src="Admin_Estudiantes.js"></script>
+    <script src="Admin_Docentes.js"></script>
+    <script src="Admin_Preceptores.js"></script>
+
+    <script src="Modulo_Preceptor.js"></script>
+    <script src="Modulo_Docente.js"></script>
+
 </body>
 </html>
-
-
