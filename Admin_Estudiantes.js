@@ -45,21 +45,23 @@ async function verEstudiantes() {
         json.data.forEach((fila, index) => {
             const edad = calcularEdad(fila[6]);
             html += `
-                <tr class="fila-estudiante" data-dni="${fila[0]}" data-nombre="${fila[1].toLowerCase()}" data-curso="${fila[2]}" data-email="${fila[3]}">
+                <tr class="fila-estudiante" data-dni="${fila[0]}" data-nombre="${String(fila[1]).toLowerCase()}" data-curso="${String(fila[2]).toLowerCase()}" data-email="${fila[3]}">
                     <td>${fila[0]}</td>
                     <td>${fila[1]}</td>
                     <td class="text-center fw-bold text-primary">${edad}</td>
                     <td class="text-center"><span class="badge bg-secondary">${fila[2]}</span></td>
                     <td class="text-center" style="width: 180px;">
-                        <button class="btn btn-sm btn-outline-success me-1" onclick="abrirModalInscripcion(${index})" title="Inscribir">📋</button>
-                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editarEstudiante(${index})" title="Editar">✏️</button>
+                        <button class="btn btn-sm btn-outline-success me-1" onclick="abrirModalInscripcion(${index})" title="Inscribir Materias">📋</button>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editarEstudiante(${index})" title="Editar Datos">✏️</button>
                         <button class="btn btn-sm btn-outline-danger" onclick="borrarEstudiante('${fila[0]}', '${fila[3]}')" title="Borrar">🗑️</button>
                     </td>
                 </tr>`;
         });
         html += `</tbody></table></div>`;
         html += renderModalHTML() + renderModalInscripcionHTML();
+        
         document.getElementById('contenido-dinamico').innerHTML = html;
+        
     } catch (e) {
         console.error(e);
         alert("Error al cargar estudiantes.");
@@ -78,8 +80,8 @@ function filtrarEstudiantes() {
         else {
             if(filtro === 'nombre') mostrar = fila.dataset.nombre.includes(busqueda);
             else if(filtro === 'dni') mostrar = fila.dataset.dni.includes(busqueda);
-            else if(filtro === 'curso') mostrar = fila.dataset.curso.toLowerCase().includes(busqueda);
-            else mostrar = (fila.dataset.nombre.includes(busqueda) || fila.dataset.dni.includes(busqueda) || fila.dataset.curso.toLowerCase().includes(busqueda));
+            else if(filtro === 'curso') mostrar = fila.dataset.curso.includes(busqueda);
+            else mostrar = (fila.dataset.nombre.includes(busqueda) || fila.dataset.dni.includes(busqueda) || fila.dataset.curso.includes(busqueda));
         }
         fila.style.display = mostrar ? '' : 'none';
         if(mostrar) contador++;
@@ -87,64 +89,12 @@ function filtrarEstudiantes() {
     document.getElementById('contadorEstudiantes').innerText = `${contador} estudiantes`;
 }
 
-// --- CRUD ---
-async function guardarEstudiante() {
-    const btn = document.getElementById('btnGuardarModal');
-    btn.disabled = true; btn.innerText = "Guardando...";
-    const datos = {
-        op: 'administrarEstudiante',
-        accion: document.getElementById('accion_form').value,
-        dni: document.getElementById('inp_dni').value,
-        nombre: document.getElementById('inp_nombre').value,
-        curso: document.getElementById('inp_curso').value,
-        email: document.getElementById('inp_email').value,
-        adulto: document.getElementById('inp_adulto').value,
-        telefono: document.getElementById('inp_tel').value,
-        nacimiento: document.getElementById('inp_nacimiento').value,
-        dniOriginal: document.getElementById('dni_original').value
-    };
-    try {
-        await fetch(URL_API, { method: 'POST', body: JSON.stringify(datos) });
-        bootstrap.Modal.getInstance(document.getElementById('modalEstudiante')).hide();
-        verEstudiantes(); 
-    } catch (e) { alert("Error al guardar."); }
-}
+// --- INSCRIPCIÓN INTELIGENTE ---
 
-function abrirModalEstudiante() {
-    document.getElementById('modalTitle').innerText = "Nuevo Estudiante";
-    document.getElementById('formEstudiante').reset();
-    document.getElementById('accion_form').value = "crear";
-    new bootstrap.Modal(document.getElementById('modalEstudiante')).show();
-}
-
-function editarEstudiante(index) {
-    const est = baseDatosAlumnos[index];
-    document.getElementById('modalTitle').innerText = "Editar Estudiante";
-    document.getElementById('accion_form').value = "editar";
-    document.getElementById('dni_original').value = est[0];
-    document.getElementById('inp_dni').value = est[0];
-    document.getElementById('inp_nombre').value = est[1];
-    document.getElementById('inp_curso').value = est[2];
-    document.getElementById('inp_email').value = est[3];
-    document.getElementById('inp_adulto').value = est[4];
-    document.getElementById('inp_tel').value = est[5];
-    if(est[6]) document.getElementById('inp_nacimiento').value = new Date(est[6]).toISOString().split('T')[0];
-    new bootstrap.Modal(document.getElementById('modalEstudiante')).show();
-}
-
-async function borrarEstudiante(dni, email) {
-    if(!confirm(`¿Eliminar alumno DNI ${dni}?`)) return;
-    try { 
-        await fetch(URL_API, { method: 'POST', body: JSON.stringify({ op: 'administrarEstudiante', accion: 'borrar', dni: dni, email: email }) });
-        verEstudiantes(); 
-    } catch (e) { alert("Error al eliminar."); }
-}
-
-// --- INSCRIPCIÓN Y AUTOCOMPLETADO ---
 async function abrirModalInscripcion(index) {
     const est = baseDatosAlumnos[index]; 
     const dni = est[0];
-    const cursoActualEstudiante = est[2]; 
+    const cursoActualEstudiante = String(est[2]).trim(); // Curso que tiene en base de datos
 
     document.getElementById('ins_dni_est').value = dni;
     document.getElementById('ins_nombre_est').value = est[1];
@@ -156,28 +106,36 @@ async function abrirModalInscripcion(index) {
     const container = document.getElementById('gridMaterias');
     const selectorCurso = document.getElementById('ins_curso_selector');
     
+    // Resetear UI
     container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-success"></div><br>Cargando materias...</div>';
-    selectorCurso.innerHTML = '<option>Cargando...</option>';
+    selectorCurso.innerHTML = '<option>Cargando cursos...</option>';
 
     try {
+        // 1. Obtener todas las materias (cachearlas)
         const respMat = await fetch(`${URL_API}?op=getMaterias&rol=Directivo`);
         const jsonMat = await respMat.json();
         cacheMateriasGlobal = jsonMat.data; 
 
+        // 2. Obtener cursos para el selector
         const respCursos = await fetch(`${URL_API}?op=getCursosDisponibles&rol=Directivo`);
         const jsonCursos = await respCursos.json();
         
+        // Llenar selector de cursos
         let optsCursos = `<option value="">-- Seleccionar Curso --</option>`;
         jsonCursos.data.forEach(c => {
-            const selected = (c == cursoActualEstudiante) ? 'selected' : '';
+            const selected = (String(c).trim() === cursoActualEstudiante) ? 'selected' : '';
             optsCursos += `<option value="${c}" ${selected}>${c}</option>`;
         });
         selectorCurso.innerHTML = optsCursos;
 
+        // 3. Generar HTML base de inputs vacíos
         let opcionesMaterias = `<option value="">-- Seleccionar --</option>`;
-        cacheMateriasGlobal.forEach(m => { opcionesMaterias += `<option value="${m[1]} (${m[3]})">${m[1]} (${m[3]})</option>`; });
+        cacheMateriasGlobal.forEach(m => { 
+            // m[1]: Nombre, m[3]: Curso
+            opcionesMaterias += `<option value="${m[1]} (${m[3]})">${m[1]} (${m[3]})</option>`; 
+        });
 
-        let htmlForm = `<h6 class="bg-light p-2 border-top border-bottom">Materias Regulares</h6><div class="row g-2 mb-3">`;
+        let htmlForm = `<h6 class="bg-light p-2 border-top border-bottom mt-3">Materias Regulares (Ciclo Lectivo)</h6><div class="row g-2 mb-3">`;
         for(let i=1; i<=12; i++) {
             htmlForm += `
             <div class="col-md-6 d-flex align-items-center mb-1">
@@ -190,18 +148,20 @@ async function abrirModalInscripcion(index) {
             </div>`;
         }
         
-        htmlForm += `</div><h6 class="bg-warning bg-opacity-25 p-2 border-top border-bottom">Intensificaciones</h6><div class="row g-2">`;
+        htmlForm += `</div><h6 class="bg-warning bg-opacity-25 p-2 border-top border-bottom">Intensificaciones (Adeuda)</h6><div class="row g-2">`;
         for(let j=1; j<=4; j++) {
-            htmlForm += `<div class="col-12 d-flex align-items-center mb-1"><span class="me-2 fw-bold text-muted small" style="width:20px">${j}.</span><select id="int_adeuda_${j}" class="form-select form-select-sm me-1">${opcionesMaterias}</select> en <select id="int_en_${j}" class="form-select form-select-sm ms-1">${opcionesMaterias}</select></div>`;
+            htmlForm += `<div class="col-12 d-flex align-items-center mb-1"><span class="me-2 fw-bold text-muted small" style="width:20px">${j}.</span><select id="int_adeuda_${j}" class="form-select form-select-sm me-1">${opcionesMaterias}</select> <span class="small mx-1">en</span> <select id="int_en_${j}" class="form-select form-select-sm ms-1">${opcionesMaterias}</select></div>`;
         }
         htmlForm += `</div>`;
         container.innerHTML = htmlForm;
 
+        // 4. Cargar datos previos si existen
         const respIns = await fetch(`${URL_API}?op=getInscripcion&rol=Directivo&dni=${dni}`);
         const jsonIns = await respIns.json();
         
         if(jsonIns.status === 'success') {
             const data = jsonIns.data; 
+            // Llenar materias
             for(let i=1; i<=12; i++) {
                 if(data[i+1] && data[i+1].includes(' - ')) {
                     const partes = data[i+1].split(' - ');
@@ -211,6 +171,7 @@ async function abrirModalInscripcion(index) {
                     }
                 }
             }
+            // Llenar intensificaciones
             for(let j=1; j<=4; j++) {
                 if(data[13+j] && data[13+j].includes(' -> ')) {
                     const partes = data[13+j].split(' -> ');
@@ -219,7 +180,10 @@ async function abrirModalInscripcion(index) {
                 }
             }
         } else {
-             if(cursoActualEstudiante) { cargarMateriasPorCurso(); }
+             // Si no hay datos previos, autocompletamos según el curso del alumno (si tiene)
+             if(cursoActualEstudiante) {
+                 cargarMateriasPorCurso();
+             }
         }
 
     } catch (e) { 
@@ -231,17 +195,26 @@ async function abrirModalInscripcion(index) {
 function cargarMateriasPorCurso() {
     const cursoSeleccionado = document.getElementById('ins_curso_selector').value;
     if(!cursoSeleccionado) return;
+
+    // Filtramos materias que pertenezcan al curso seleccionado
     const materiasDelCurso = cacheMateriasGlobal.filter(m => String(m[3]).trim() === String(cursoSeleccionado).trim());
+
+    // Limpiamos campos primero
     for(let i=1; i<=12; i++) {
          document.getElementById(`materia_${i}`).value = "";
          document.getElementById(`estado_${i}`).value = "Cursa";
     }
+
+    // Llenamos
     materiasDelCurso.forEach((mat, index) => {
         if(index < 12) {
             const i = index + 1;
             const valorSelect = `${mat[1]} (${mat[3]})`; 
             const selectElement = document.getElementById(`materia_${i}`);
+            
+            // Verificamos si la opción existe en el select
             let existe = Array.from(selectElement.options).some(option => option.value === valorSelect);
+            
             if(existe) {
                 selectElement.value = valorSelect;
                 document.getElementById(`estado_${i}`).value = "Cursa";
@@ -268,7 +241,62 @@ async function guardarInscripcion() {
 
     try {
         await fetch(URL_API, { method: 'POST', body: JSON.stringify(datos) });
-        bootstrap.Modal.getInstance(document.getElementById('modalInscripcion')).hide();
+        
+        const modalEl = document.getElementById('modalInscripcion');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if(modal) modal.hide();
+        
         alert("Inscripción guardada correctamente.");
     } catch (e) { alert("Error al guardar."); } finally { btn.disabled = false; btn.innerText = "Guardar Inscripción"; }
+}
+
+// FUNCIONES CRUD BASICAS (Editar, Crear, Borrar estudiante) SE MANTIENEN IGUAL QUE ANTES...
+function abrirModalEstudiante() {
+    document.getElementById('modalTitle').innerText = "Nuevo Estudiante";
+    document.getElementById('formEstudiante').reset();
+    document.getElementById('accion_form').value = "crear";
+    new bootstrap.Modal(document.getElementById('modalEstudiante')).show();
+}
+function editarEstudiante(index) {
+    const est = baseDatosAlumnos[index];
+    document.getElementById('modalTitle').innerText = "Editar Estudiante";
+    document.getElementById('accion_form').value = "editar";
+    document.getElementById('dni_original').value = est[0];
+    document.getElementById('inp_dni').value = est[0];
+    document.getElementById('inp_nombre').value = est[1];
+    document.getElementById('inp_curso').value = est[2];
+    document.getElementById('inp_email').value = est[3];
+    document.getElementById('inp_adulto').value = est[4];
+    document.getElementById('inp_tel').value = est[5];
+    if(est[6]) document.getElementById('inp_nacimiento').value = new Date(est[6]).toISOString().split('T')[0];
+    new bootstrap.Modal(document.getElementById('modalEstudiante')).show();
+}
+async function guardarEstudiante() {
+    // ... (Misma lógica de guardado de estudiante que tenías)
+     const btn = document.getElementById('btnGuardarModal');
+    btn.disabled = true; btn.innerText = "Guardando...";
+    const datos = {
+        op: 'administrarEstudiante',
+        accion: document.getElementById('accion_form').value,
+        dni: document.getElementById('inp_dni').value,
+        nombre: document.getElementById('inp_nombre').value,
+        curso: document.getElementById('inp_curso').value,
+        email: document.getElementById('inp_email').value,
+        adulto: document.getElementById('inp_adulto').value,
+        telefono: document.getElementById('inp_tel').value,
+        nacimiento: document.getElementById('inp_nacimiento').value,
+        dniOriginal: document.getElementById('dni_original').value
+    };
+    try {
+        await fetch(URL_API, { method: 'POST', body: JSON.stringify(datos) });
+        bootstrap.Modal.getInstance(document.getElementById('modalEstudiante')).hide();
+        verEstudiantes(); 
+    } catch (e) { alert("Error al guardar."); } finally { btn.disabled = false; btn.innerText = "Guardar"; }
+}
+async function borrarEstudiante(dni, email) {
+    if(!confirm(`¿Eliminar alumno DNI ${dni}?`)) return;
+    try { 
+        await fetch(URL_API, { method: 'POST', body: JSON.stringify({ op: 'administrarEstudiante', accion: 'borrar', dni: dni, email: email }) });
+        verEstudiantes(); 
+    } catch (e) { alert("Error al eliminar."); }
 }
