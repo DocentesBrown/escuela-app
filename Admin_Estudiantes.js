@@ -44,6 +44,7 @@ async function verEstudiantes() {
         
         json.data.forEach((fila, index) => {
             const edad = calcularEdad(fila[6]);
+            // fila[2] es el Curso. Ahora se verá actualizado tras la inscripción.
             html += `
                 <tr class="fila-estudiante" data-dni="${fila[0]}" data-nombre="${String(fila[1]).toLowerCase()}" data-curso="${String(fila[2]).toLowerCase()}" data-email="${fila[3]}">
                     <td>${fila[0]}</td>
@@ -89,12 +90,12 @@ function filtrarEstudiantes() {
     document.getElementById('contadorEstudiantes').innerText = `${contador} estudiantes`;
 }
 
-// --- INSCRIPCIÓN INTELIGENTE ---
+// --- INSCRIPCIÓN ---
 
 async function abrirModalInscripcion(index) {
     const est = baseDatosAlumnos[index]; 
     const dni = est[0];
-    const cursoActualEstudiante = String(est[2]).trim(); // Curso que tiene en base de datos
+    const cursoActualEstudiante = String(est[2]).trim(); 
 
     document.getElementById('ins_dni_est').value = dni;
     document.getElementById('ins_nombre_est').value = est[1];
@@ -106,21 +107,17 @@ async function abrirModalInscripcion(index) {
     const container = document.getElementById('gridMaterias');
     const selectorCurso = document.getElementById('ins_curso_selector');
     
-    // Resetear UI
     container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-success"></div><br>Cargando materias...</div>';
     selectorCurso.innerHTML = '<option>Cargando cursos...</option>';
 
     try {
-        // 1. Obtener todas las materias (cachearlas)
         const respMat = await fetch(`${URL_API}?op=getMaterias&rol=Directivo`);
         const jsonMat = await respMat.json();
         cacheMateriasGlobal = jsonMat.data; 
 
-        // 2. Obtener cursos para el selector
         const respCursos = await fetch(`${URL_API}?op=getCursosDisponibles&rol=Directivo`);
         const jsonCursos = await respCursos.json();
         
-        // Llenar selector de cursos
         let optsCursos = `<option value="">-- Seleccionar Curso --</option>`;
         jsonCursos.data.forEach(c => {
             const selected = (String(c).trim() === cursoActualEstudiante) ? 'selected' : '';
@@ -128,14 +125,12 @@ async function abrirModalInscripcion(index) {
         });
         selectorCurso.innerHTML = optsCursos;
 
-        // 3. Generar HTML base de inputs vacíos
         let opcionesMaterias = `<option value="">-- Seleccionar --</option>`;
         cacheMateriasGlobal.forEach(m => { 
-            // m[1]: Nombre, m[3]: Curso
             opcionesMaterias += `<option value="${m[1]} (${m[3]})">${m[1]} (${m[3]})</option>`; 
         });
 
-        let htmlForm = `<h6 class="bg-light p-2 border-top border-bottom mt-3">Materias Regulares (Ciclo Lectivo)</h6><div class="row g-2 mb-3">`;
+        let htmlForm = `<h6 class="bg-light p-2 border-top border-bottom mt-3">Materias Regulares</h6><div class="row g-2 mb-3">`;
         for(let i=1; i<=12; i++) {
             htmlForm += `
             <div class="col-md-6 d-flex align-items-center mb-1">
@@ -148,20 +143,18 @@ async function abrirModalInscripcion(index) {
             </div>`;
         }
         
-        htmlForm += `</div><h6 class="bg-warning bg-opacity-25 p-2 border-top border-bottom">Intensificaciones (Adeuda)</h6><div class="row g-2">`;
+        htmlForm += `</div><h6 class="bg-warning bg-opacity-25 p-2 border-top border-bottom">Intensificaciones</h6><div class="row g-2">`;
         for(let j=1; j<=4; j++) {
-            htmlForm += `<div class="col-12 d-flex align-items-center mb-1"><span class="me-2 fw-bold text-muted small" style="width:20px">${j}.</span><select id="int_adeuda_${j}" class="form-select form-select-sm me-1">${opcionesMaterias}</select> <span class="small mx-1">en</span> <select id="int_en_${j}" class="form-select form-select-sm ms-1">${opcionesMaterias}</select></div>`;
+            htmlForm += `<div class="col-12 d-flex align-items-center mb-1"><span class="me-2 fw-bold text-muted small" style="width:20px">${j}.</span><select id="int_adeuda_${j}" class="form-select form-select-sm me-1">${opcionesMaterias}</select> en <select id="int_en_${j}" class="form-select form-select-sm ms-1">${opcionesMaterias}</select></div>`;
         }
         htmlForm += `</div>`;
         container.innerHTML = htmlForm;
 
-        // 4. Cargar datos previos si existen
         const respIns = await fetch(`${URL_API}?op=getInscripcion&rol=Directivo&dni=${dni}`);
         const jsonIns = await respIns.json();
         
         if(jsonIns.status === 'success') {
             const data = jsonIns.data; 
-            // Llenar materias
             for(let i=1; i<=12; i++) {
                 if(data[i+1] && data[i+1].includes(' - ')) {
                     const partes = data[i+1].split(' - ');
@@ -171,7 +164,6 @@ async function abrirModalInscripcion(index) {
                     }
                 }
             }
-            // Llenar intensificaciones
             for(let j=1; j<=4; j++) {
                 if(data[13+j] && data[13+j].includes(' -> ')) {
                     const partes = data[13+j].split(' -> ');
@@ -180,10 +172,7 @@ async function abrirModalInscripcion(index) {
                 }
             }
         } else {
-             // Si no hay datos previos, autocompletamos según el curso del alumno (si tiene)
-             if(cursoActualEstudiante) {
-                 cargarMateriasPorCurso();
-             }
+             if(cursoActualEstudiante) { cargarMateriasPorCurso(); }
         }
 
     } catch (e) { 
@@ -196,23 +185,18 @@ function cargarMateriasPorCurso() {
     const cursoSeleccionado = document.getElementById('ins_curso_selector').value;
     if(!cursoSeleccionado) return;
 
-    // Filtramos materias que pertenezcan al curso seleccionado
     const materiasDelCurso = cacheMateriasGlobal.filter(m => String(m[3]).trim() === String(cursoSeleccionado).trim());
 
-    // Limpiamos campos primero
     for(let i=1; i<=12; i++) {
          document.getElementById(`materia_${i}`).value = "";
          document.getElementById(`estado_${i}`).value = "Cursa";
     }
 
-    // Llenamos
     materiasDelCurso.forEach((mat, index) => {
         if(index < 12) {
             const i = index + 1;
             const valorSelect = `${mat[1]} (${mat[3]})`; 
             const selectElement = document.getElementById(`materia_${i}`);
-            
-            // Verificamos si la opción existe en el select
             let existe = Array.from(selectElement.options).some(option => option.value === valorSelect);
             
             if(existe) {
@@ -223,10 +207,20 @@ function cargarMateriasPorCurso() {
     });
 }
 
+// --- GUARDA INSCRIPCIÓN Y ACTUALIZA CURSO ---
 async function guardarInscripcion() {
     const btn = document.getElementById('btnGuardarIns');
     btn.disabled = true; btn.innerText = "Guardando...";
-    const datos = { op: 'guardarInscripcion', dni: document.getElementById('ins_dni_est').value, nombre: document.getElementById('ins_nombre_est').value };
+    
+    // Capturamos el curso seleccionado
+    const cursoSeleccionado = document.getElementById('ins_curso_selector').value;
+
+    const datos = { 
+        op: 'guardarInscripcion', 
+        dni: document.getElementById('ins_dni_est').value, 
+        nombre: document.getElementById('ins_nombre_est').value,
+        curso: cursoSeleccionado // <<-- ENVIAMOS EL CURSO NUEVO AL BACKEND
+    };
 
     for(let i=1; i<=12; i++) {
         const mat = document.getElementById(`materia_${i}`).value;
@@ -247,10 +241,15 @@ async function guardarInscripcion() {
         if(modal) modal.hide();
         
         alert("Inscripción guardada correctamente.");
-    } catch (e) { alert("Error al guardar."); } finally { btn.disabled = false; btn.innerText = "Guardar Inscripción"; }
+        verEstudiantes(); // Recargar la tabla para ver el curso actualizado
+    } catch (e) { 
+        alert("Error al guardar."); 
+    } finally { 
+        btn.disabled = false; btn.innerText = "Guardar Inscripción"; 
+    }
 }
 
-// FUNCIONES CRUD BASICAS (Editar, Crear, Borrar estudiante) SE MANTIENEN IGUAL QUE ANTES...
+// --- CRUD ---
 function abrirModalEstudiante() {
     document.getElementById('modalTitle').innerText = "Nuevo Estudiante";
     document.getElementById('formEstudiante').reset();
@@ -272,8 +271,7 @@ function editarEstudiante(index) {
     new bootstrap.Modal(document.getElementById('modalEstudiante')).show();
 }
 async function guardarEstudiante() {
-    // ... (Misma lógica de guardado de estudiante que tenías)
-     const btn = document.getElementById('btnGuardarModal');
+    const btn = document.getElementById('btnGuardarModal');
     btn.disabled = true; btn.innerText = "Guardando...";
     const datos = {
         op: 'administrarEstudiante',
