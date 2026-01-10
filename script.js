@@ -1363,796 +1363,392 @@ function renderModalAsignacionCompletaHTML() {
 }
 
 // ==========================================
-// 6. MÓDULO DOCENTE COMPLETO
+// 3. MÓDULO DOCENTE (NUEVO Y MEJORADO)
+// PEGA ESTO REEMPLAZANDO LAS FUNCIONES DE DOCENTE ANTIGUAS
 // ==========================================
 
-// --- MÓDULO PRINCIPAL DOCENTE ---
-
 async function iniciarModuloDocente() {
-    document.getElementById('contenido-dinamico').innerHTML = `
-        <div class="text-center py-5">
-            <div class="spinner-border text-primary"></div>
-            <p class="mt-2">Cargando tus cursos...</p>
-        </div>`;
-    
+    const contenedor = document.getElementById('contenido-dinamico');
+    contenedor.innerHTML = '<div class="spinner-border text-primary"></div> Cargando tus cursos...';
+
     try {
-        // Obtener DNI del docente desde usuarioActual
-        const resp = await fetch(`${URL_API}?op=getCursosDocente&rol=Docente&dni=${usuarioActual.dni || ''}`);
+        const resp = await fetch(`${URL_API}?op=getCursosDocente&dni=${usuarioActual.dni}`);
         const json = await resp.json();
-        
-        if (json.status !== 'success') {
-            document.getElementById('contenido-dinamico').innerHTML = `
-                <div class="alert alert-warning">
-                    <h5>No tienes cursos asignados</h5>
-                    <p>Contacta con la dirección para que te asignen materias.</p>
-                </div>`;
-            return;
-        }
-        
+
+        if (json.status !== 'success') throw new Error(json.message);
+
         let html = `
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">🏫 Mis Cursos Asignados</h5>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">Tienes <strong>${json.totalCursos} cursos</strong> asignados.</p>
-                </div>
-            </div>
-            
-            <div class="row" id="lista-cursos">`;
-        
-        json.data.forEach((cursoData, index) => {
+        <div class="mb-4">
+            <h3>Panel Docente</h3>
+            <p class="text-muted">Bienvenido/a, ${usuarioActual.nombre}</p>
+        </div>
+        <div class="row g-3">`;
+
+        json.data.forEach(curso => {
             html += `
-                <div class="col-md-6 mb-3">
-                    <div class="card h-100 shadow-sm border-primary">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">${cursoData.curso}</h6>
-                        </div>
-                        <div class="card-body">
-                            <p><strong>${cursoData.totalEstudiantes}</strong> estudiantes</p>
-                            <p><strong>Materias:</strong></p>
-                            <ul class="list-unstyled">`;
-            
-            cursoData.materias.forEach(materia => {
-                html += `<li class="mb-1">
-                            <button class="btn btn-sm btn-outline-primary w-100 text-start" 
-                                    onclick="abrirCursoDocente('${cursoData.curso}', ${materia.id}, '${materia.nombre}')">
-                                📚 ${materia.nombre} 
-                                <span class="badge bg-secondary float-end">${materia.tipoAsignacion}</span>
-                            </button>
-                         </li>`;
-            });
-            
-            html += `    </ul>
-                        </div>
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white fw-bold">${curso.curso}</div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">`;
+            curso.materias.forEach(mat => {
+                 html += `
+                 <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${mat.nombre}</strong>
+                        <div class="small text-muted">${mat.tipoAsignacion}</div>
                     </div>
-                </div>`;
+                    <button class="btn btn-sm btn-outline-primary" onclick="gestionarMateria('${curso.curso}', '${mat.id}')">
+                        Gestionar
+                    </button>
+                 </li>`;
+            });
+            html += `</ul></div></div></div>`;
         });
         
         html += `</div>`;
-        
-        document.getElementById('contenido-dinamico').innerHTML = html;
-        
+        contenedor.innerHTML = html;
+
     } catch (e) {
-        console.error('Error cargando cursos docente:', e);
-        document.getElementById('contenido-dinamico').innerHTML = `
-            <div class="alert alert-danger">
-                <h5>Error al cargar cursos</h5>
-                <p>${e.message}</p>
-            </div>`;
+        contenedor.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
     }
 }
 
-async function abrirCursoDocente(curso, idMateria, nombreMateria) {
-    document.getElementById('contenido-dinamico').innerHTML = `
-        <div class="text-center py-5">
-            <div class="spinner-border text-primary"></div>
-            <p class="mt-2">Cargando datos del curso...</p>
-        </div>`;
+async function gestionarMateria(curso, idMateria) {
+    const contenedor = document.getElementById('contenido-dinamico');
+    contenedor.innerHTML = '<div class="spinner-border text-primary"></div> Cargando aula...';
     
+    let html = `
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>Materia: <span id="nombreMateriaTitulo">Cargando...</span> - Curso: ${curso}</h5>
+        <button class="btn btn-outline-secondary btn-sm" onclick="iniciarModuloDocente()">⬅ Volver</button>
+    </div>
+
+    <ul class="nav nav-tabs mb-3" id="docenteTabs">
+      <li class="nav-item">
+        <button class="nav-link active" id="tab-asistencia" data-bs-toggle="tab" data-bs-target="#panel-asistencia">Asistencia</button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" id="tab-notas" data-bs-toggle="tab" data-bs-target="#panel-notas">Notas y Calificaciones</button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="myTabContent">
+      <div class="tab-pane fade show active" id="panel-asistencia">
+           <div class="card p-3 mb-3">
+               <div class="d-flex justify-content-between align-items-center mb-2">
+                   <h6><i class="bi bi-calendar-check"></i> Tomar Asistencia</h6>
+                   <div class="d-flex align-items-center">
+                       <label class="me-2 small">Fecha:</label>
+                       <input type="date" id="fechaAsistenciaDocente" class="form-control form-control-sm" value="${new Date().toISOString().split('T')[0]}">
+                   </div>
+               </div>
+               <div id="contenedor-tabla-asistencia" class="mt-2">
+                  <div class="text-center p-3">Cargando lista...</div>
+               </div>
+           </div>
+      </div>
+
+      <div class="tab-pane fade" id="panel-notas">
+           <div class="card p-3">
+               <h6><i class="bi bi-journal-bookmark"></i> Planilla de Calificaciones</h6>
+               <div class="alert alert-info py-1 small">
+                  <i class="bi bi-info-circle"></i> Reglas: Nota >= 7 anula intensificación. Diciembre se habilita si Final < 7. Febrero si Diciembre < 4.
+               </div>
+               <div id="contenedor-tabla-notas"></div>
+           </div>
+      </div>
+    </div>`;
+    
+    contenedor.innerHTML = html;
+    cargarAlumnosMateria(usuarioActual.dni, curso, idMateria);
+}
+
+async function cargarAlumnosMateria(dniDocente, curso, idMateria) {
     try {
-        const resp = await fetch(`${URL_API}?op=getEstudiantesConDatos&rol=Docente&dniDocente=${usuarioActual.dni || ''}&curso=${curso}&idMateria=${idMateria}`);
+        const resp = await fetch(`${URL_API}?op=getEstudiantesConDatos&dniDocente=${dniDocente}&curso=${curso}&idMateria=${idMateria}`);
         const json = await resp.json();
         
-        if (json.status !== 'success') {
-            throw new Error('No se pudieron cargar los datos del curso');
+        if(json.status === 'success') {
+            document.getElementById('nombreMateriaTitulo').innerText = json.data.materia.nombre;
+            const estudiantes = json.data.estudiantes;
+            renderTablaAsistenciaDocente(estudiantes, idMateria);
+            renderTablaNotas(estudiantes, idMateria);
         }
-        
-        // Guardar información del contexto actual
-        window.cursoActualDocente = {
-            curso: curso,
-            idMateria: idMateria,
-            nombreMateria: nombreMateria,
-            estudiantes: json.data.estudiantes
-        };
-        
-        let html = `
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="mb-0">📚 ${nombreMateria}</h5>
-                        <small>${curso} | ${json.data.estudiantes.length} estudiantes</small>
-                    </div>
-                    <div>
-                        <button class="btn btn-sm btn-light me-2" onclick="contactarPreceptor()">📞 Contactar Preceptor</button>
-                        <button class="btn btn-sm btn-warning" onclick="iniciarModuloDocente()">← Volver a cursos</button>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <!-- PESTAÑAS -->
-                    <ul class="nav nav-tabs mb-3" id="tabsDocente">
-                        <li class="nav-item">
-                            <button class="nav-link active" onclick="mostrarTabDocente('asistencia')">📅 Asistencia</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" onclick="mostrarTabDocente('notas')">📊 Notas</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" onclick="mostrarTabDocente('resumen')">📈 Resumen</button>
-                        </li>
-                    </ul>
-                    
-                    <!-- CONTENIDO DE PESTAÑAS -->
-                    <div id="tabAsistencia">
-                        ${renderTablaAsistenciaDocente(json.data.estudiantes)}
-                    </div>
-                    
-                    <div id="tabNotas" class="d-none">
-                        ${renderTablaNotasDocente(json.data.estudiantes)}
-                    </div>
-                    
-                    <div id="tabResumen" class="d-none">
-                        ${renderResumenDocente(json.data.estudiantes)}
-                    </div>
-                </div>
-            </div>`;
-        
-        document.getElementById('contenido-dinamico').innerHTML = html;
-        
-    } catch (e) {
-        console.error('Error abriendo curso:', e);
-        document.getElementById('contenido-dinamico').innerHTML = `
-            <div class="alert alert-danger">
-                <h5>Error al cargar el curso</h5>
-                <p>${e.message}</p>
-                <button class="btn btn-secondary mt-2" onclick="iniciarModuloDocente()">← Volver</button>
-            </div>`;
+    } catch(e) {
+        alert("Error cargando datos del curso");
     }
 }
 
-function renderTablaAsistenciaDocente(estudiantes) {
-    const hoy = new Date().toISOString().split('T')[0];
-    
+// --- RENDER ASISTENCIA (SIN J, CON BOTÓN HISTORIAL) ---
+function renderTablaAsistenciaDocente(estudiantes, idMateria) {
+    if (!estudiantes || estudiantes.length === 0) {
+        document.getElementById('contenedor-tabla-asistencia').innerHTML = '<div class="alert alert-warning">No hay estudiantes.</div>';
+        return;
+    }
+
     let html = `
-        <div class="card mb-3">
-            <div class="card-body">
-                <h6>Tomar Asistencia Hoy (${hoy})</h6>
-                <p class="text-muted small">Selecciona el estado de asistencia para cada estudiante</p>
-            </div>
-        </div>
-        
-        <div class="table-responsive">
-            <table class="table table-hover table-striped align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Estudiante</th>
-                        <th class="text-center" style="background:#d4edda;">P</th>
-                        <th class="text-center" style="background:#f8d7da;">A</th>
-                        <th class="text-center" style="background:#fff3cd;">T</th>
-                        <th class="text-center" style="background:#e2e3e5;">J</th>
-                        <th>% Asistencia</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-    
+    <div class="table-responsive">
+      <table class="table table-hover align-middle table-sm">
+        <thead class="table-light">
+          <tr>
+            <th>Estudiante</th>
+            <th>Estado</th>
+            <th class="text-center">Historial</th>
+            <th class="text-center">Asistencia Global</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
     estudiantes.forEach(est => {
-        const porcentaje = est.asistencia.porcentaje || 0;
-        let badgeColor = 'success';
-        if (porcentaje < 75) badgeColor = 'danger';
-        else if (porcentaje < 85) badgeColor = 'warning';
+        let porc = est.asistencia.porcentaje;
+        let colorPorc = porc < 60 ? 'text-danger' : (porc < 80 ? 'text-warning' : 'text-success');
         
         html += `
-            <tr>
-                <td class="fw-bold">${est.nombre}</td>
-                <td class="text-center" style="background:#d4edda;">
-                    <input type="radio" name="asis_${est.dni}" value="P" checked style="transform: scale(1.3);">
-                </td>
-                <td class="text-center" style="background:#f8d7da;">
-                    <input type="radio" name="asis_${est.dni}" value="A" style="transform: scale(1.3);">
-                </td>
-                <td class="text-center" style="background:#fff3cd;">
-                    <input type="radio" name="asis_${est.dni}" value="T" style="transform: scale(1.3);">
-                </td>
-                <td class="text-center" style="background:#e2e3e5;">
-                    <input type="radio" name="asis_${est.dni}" value="J" style="transform: scale(1.3);">
-                </td>
-                <td>
-                    <span class="badge bg-${badgeColor}">${porcentaje}%</span>
-                    <small class="text-muted ms-2">(${est.asistencia.presentes}/${est.asistencia.total})</small>
-                </td>
-            </tr>`;
+        <tr>
+          <td>
+            <div class="fw-bold">${est.nombre}</div>
+            <div class="small text-muted">DNI: ${est.dni}</div>
+          </td>
+          <td>
+            <div class="btn-group" role="group">
+              <input type="radio" class="btn-check" name="asis_${est.dni}" id="P_${est.dni}" value="P" checked>
+              <label class="btn btn-outline-success btn-sm" for="P_${est.dni}">P</label>
+
+              <input type="radio" class="btn-check" name="asis_${est.dni}" id="A_${est.dni}" value="A">
+              <label class="btn btn-outline-danger btn-sm" for="A_${est.dni}">Ausente</label>
+
+              <input type="radio" class="btn-check" name="asis_${est.dni}" id="T_${est.dni}" value="T">
+              <label class="btn btn-outline-warning btn-sm" for="T_${est.dni}">Tarde</label>
+            </div>
+          </td>
+          <td class="text-center">
+             <button class="btn btn-sm btn-info text-white" onclick="verHistorialMateria('${est.dni}', '${est.nombre}', '${idMateria}')">
+                <i class="bi bi-clock-history"></i> Ver Faltas
+             </button>
+          </td>
+          <td class="text-center">
+             <div class="fw-bold ${colorPorc}">${porc}%</div>
+             <div class="small text-muted">(${est.asistencia.presentes}/${est.asistencia.total})</div>
+          </td>
+        </tr>`;
     });
-    
-    html += `
-                </tbody>
-            </table>
-        </div>
-        
-        <div class="mt-3">
-            <button class="btn btn-success btn-lg w-100 shadow" onclick="guardarAsistenciaDocente()">
-                💾 Guardar Asistencia
-            </button>
-        </div>`;
-    
-    return html;
+
+    html += `</tbody></table></div>
+    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+        <button class="btn btn-primary" onclick="enviarAsistenciaDocente('${idMateria}')">
+            <i class="bi bi-save"></i> Guardar Asistencia
+        </button>
+    </div>`;
+
+    document.getElementById('contenedor-tabla-asistencia').innerHTML = html;
 }
 
-function renderTablaNotasDocente(estudiantes) {
+// --- RENDER NOTAS (CON LOGICA VISUAL) ---
+function renderTablaNotas(estudiantes, idMateria) {
     let html = `
-        <div class="card mb-3">
-            <div class="card-body">
-                <h6>Sistema de Calificaciones</h6>
-                <p class="text-muted small">
-                    <strong>1er Cuatrimestre:</strong> Nota regular + Intensificación<br>
-                    <strong>2do Cuatrimestre:</strong> Nota regular + Intensificación<br>
-                    <strong>Nota Final:</strong> Se calcula automáticamente<br>
-                    <strong>Diciembre/Febrero:</strong> Recuperatorios<br>
-                    <strong>Nota Definitiva:</strong> Puede ser manual
-                </p>
-            </div>
-        </div>
-        
-        <div class="table-responsive">
-            <table class="table table-hover table-bordered align-middle">
-                <thead class="table-dark">
-                    <tr class="text-center">
-                        <th rowspan="2">Estudiante</th>
-                        <th colspan="2" class="bg-info">1er Cuatrimestre</th>
-                        <th colspan="2" class="bg-warning">2do Cuatrimestre</th>
-                        <th rowspan="2" class="bg-success">Nota Final</th>
-                        <th rowspan="2" class="bg-secondary">Diciembre</th>
-                        <th rowspan="2" class="bg-secondary">Febrero</th>
-                        <th rowspan="2" class="bg-primary">Definitiva</th>
-                    </tr>
-                    <tr class="text-center">
-                        <th class="bg-info-subtle">Nota</th>
-                        <th class="bg-info-subtle">Intensif.</th>
-                        <th class="bg-warning-subtle">Nota</th>
-                        <th class="bg-warning-subtle">Intensif.</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-    
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm align-middle text-center small">
+        <thead class="table-light">
+          <tr>
+            <th rowspan="2" class="align-middle">Estudiante</th>
+            <th colspan="2">1º Cuat.</th>
+            <th colspan="2">2º Cuat.</th>
+            <th rowspan="2" class="align-middle bg-light">Final</th>
+            <th rowspan="2" class="align-middle">Dic.</th>
+            <th rowspan="2" class="align-middle">Feb.</th>
+            <th rowspan="2" class="align-middle bg-warning bg-opacity-10">DEF</th>
+          </tr>
+          <tr>
+            <th>Nota</th><th>Intens.</th>
+            <th>Nota</th><th>Intens.</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
     estudiantes.forEach(est => {
-        const notas = est.notas;
-        
+        let n = est.notas;
+        const c1 = parseFloat(n.nota1_C1) || 0;
+        const c2 = parseFloat(n.nota1_C2) || 0;
+        const final = parseFloat(n.nota_final) || 0;
+        const dic = parseFloat(n.diciembre) || 0;
+
+        const disableInt1 = (c1 >= 7) ? 'disabled style="background-color: #e9ecef;"' : '';
+        const disableInt2 = (c2 >= 7) ? 'disabled style="background-color: #e9ecef;"' : '';
+        const disableDic = (final >= 7) ? 'disabled style="background-color: #e9ecef;"' : '';
+        const disableFeb = (final >= 7 || dic >= 4) ? 'disabled style="background-color: #e9ecef;"' : '';
+
         html += `
-            <tr>
-                <td class="fw-bold">${est.nombre}</td>
-                
-                <!-- 1er Cuatrimestre -->
-                <td class="text-center">
-                    <input type="number" min="0" max="10" step="0.1" 
-                           class="form-control form-control-sm text-center nota-input" 
-                           data-dni="${est.dni}" data-campo="nota1_C1"
-                           value="${notas.nota1_C1 || ''}" 
-                           placeholder="0-10">
-                </td>
-                <td class="text-center">
-                    <input type="number" min="0" max="10" step="0.1" 
-                           class="form-control form-control-sm text-center nota-input" 
-                           data-dni="${est.dni}" data-campo="intensificacion1"
-                           value="${notas.intensificacion1 || ''}" 
-                           placeholder="0-10">
-                </td>
-                
-                <!-- 2do Cuatrimestre -->
-                <td class="text-center">
-                    <input type="number" min="0" max="10" step="0.1" 
-                           class="form-control form-control-sm text-center nota-input" 
-                           data-dni="${est.dni}" data-campo="nota1_C2"
-                           value="${notas.nota1_C2 || ''}" 
-                           placeholder="0-10">
-                </td>
-                <td class="text-center">
-                    <input type="number" min="0" max="10" step="0.1" 
-                           class="form-control form-control-sm text-center nota-input" 
-                           data-dni="${est.dni}" data-campo="intensificacion2"
-                           value="${notas.intensificacion2 || ''}" 
-                           placeholder="0-10">
-                </td>
-                
-                <!-- Nota Final (calculada automáticamente, solo lectura) -->
-                <td class="text-center bg-success-subtle fw-bold">
-                    <span id="nota_final_${est.dni}">${notas.nota_final || '0.0'}</span>
-                </td>
-                
-                <!-- Diciembre y Febrero -->
-                <td class="text-center">
-                    <input type="number" min="0" max="10" step="0.1" 
-                           class="form-control form-control-sm text-center nota-input" 
-                           data-dni="${est.dni}" data-campo="diciembre"
-                           value="${notas.diciembre || ''}" 
-                           placeholder="0-10">
-                </td>
-                <td class="text-center">
-                    <input type="number" min="0" max="10" step="0.1" 
-                           class="form-control form-control-sm text-center nota-input" 
-                           data-dni="${est.dni}" data-campo="febrero"
-                           value="${notas.febrero || ''}" 
-                           placeholder="0-10">
-                </td>
-                
-                <!-- Nota Definitiva -->
-                <td class="text-center">
-                    <input type="number" min="0" max="10" step="0.1" 
-                           class="form-control form-control-sm text-center nota-input fw-bold" 
-                           data-dni="${est.dni}" data-campo="nota_definitiva"
-                           value="${notas.nota_definitiva || ''}" 
-                           placeholder="0-10">
-                </td>
-            </tr>`;
+        <tr data-dni="${est.dni}">
+          <td class="text-start text-truncate" style="max-width: 150px;" title="${est.nombre}">${est.nombre}</td>
+          <td><input type="number" class="form-control form-control-sm inp-nota inp-c1" value="${n.nota1_C1}" oninput="checkLogicaNotas(this)"></td>
+          <td><input type="number" class="form-control form-control-sm inp-nota inp-int1" value="${n.intensificacion1}" ${disableInt1}></td>
+          <td><input type="number" class="form-control form-control-sm inp-nota inp-c2" value="${n.nota1_C2}" oninput="checkLogicaNotas(this)"></td>
+          <td><input type="number" class="form-control form-control-sm inp-nota inp-int2" value="${n.intensificacion2}" ${disableInt2}></td>
+          <td class="bg-light fw-bold">${n.nota_final}</td>
+          <td><input type="number" class="form-control form-control-sm inp-nota inp-dic" value="${n.diciembre}" oninput="checkLogicaNotas(this)" ${disableDic}></td>
+          <td><input type="number" class="form-control form-control-sm inp-nota inp-feb" value="${n.febrero}" ${disableFeb}></td>
+          <td class="fw-bold text-primary">${n.nota_definitiva}</td>
+        </tr>`;
     });
-    
-    html += `
-                </tbody>
-            </table>
-        </div>
-        
-        <div class="row mt-3">
-            <div class="col-md-6">
-                <button class="btn btn-secondary w-100" onclick="calcularNotasAutomaticamente()">
-                    🔄 Calcular Automáticamente
-                </button>
-            </div>
-            <div class="col-md-6">
-                <button class="btn btn-primary w-100" onclick="guardarNotasDocente()">
-                    💾 Guardar Todas las Notas
-                </button>
-            </div>
-        </div>`;
-    
-    return html;
+
+    html += `</tbody></table></div>
+    <div class="mt-3 text-end">
+       <button class="btn btn-success" onclick="guardarNotasDocente('${idMateria}')">
+         <i class="bi bi-save"></i> Guardar Todas las Notas
+       </button>
+    </div>`;
+
+    document.getElementById('contenedor-tabla-notas').innerHTML = html;
 }
 
-function renderResumenDocente(estudiantes) {
-    // Calcular estadísticas
-    const totalEstudiantes = estudiantes.length;
+function checkLogicaNotas(input) {
+    const row = input.closest('tr');
+    const c1 = parseFloat(row.querySelector('.inp-c1').value) || 0;
+    const c2 = parseFloat(row.querySelector('.inp-c2').value) || 0;
     
-    // Estadísticas de asistencia
-    const porcentajesAsistencia = estudiantes.map(e => e.asistencia.porcentaje || 0);
-    const promedioAsistencia = porcentajesAsistencia.length > 0 ? 
-        Math.round(porcentajesAsistencia.reduce((a, b) => a + b, 0) / porcentajesAsistencia.length) : 0;
+    const int1 = row.querySelector('.inp-int1');
+    const int2 = row.querySelector('.inp-int2');
     
-    const bajaAsistencia = estudiantes.filter(e => (e.asistencia.porcentaje || 0) < 75).length;
-    
-    // Estadísticas de notas
-    const notasFinales = estudiantes.map(e => parseFloat(e.notas.nota_final) || 0);
-    const promedioNotas = notasFinales.length > 0 ? 
-        (notasFinales.reduce((a, b) => a + b, 0) / notasFinales.length).toFixed(1) : '0.0';
-    
-    const aprobados = estudiantes.filter(e => (parseFloat(e.notas.nota_final) || 0) >= 6).length;
-    const desaprobados = totalEstudiantes - aprobados;
-    
-    let html = `
-        <div class="row">
-            <!-- TARJETAS RESUMEN -->
-            <div class="col-md-3 mb-3">
-                <div class="card text-center shadow-sm border-primary">
-                    <div class="card-body">
-                        <h1 class="display-5">${totalEstudiantes}</h1>
-                        <p class="text-muted">Estudiantes</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-3 mb-3">
-                <div class="card text-center shadow-sm border-success">
-                    <div class="card-body">
-                        <h1 class="display-5">${promedioAsistencia}%</h1>
-                        <p class="text-muted">Asistencia Promedio</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-3 mb-3">
-                <div class="card text-center shadow-sm border-warning">
-                    <div class="card-body">
-                        <h1 class="display-5">${promedioNotas}</h1>
-                        <p class="text-muted">Nota Promedio</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-3 mb-3">
-                <div class="card text-center shadow-sm border-info">
-                    <div class="card-body">
-                        <h1 class="display-5">${aprobados}/${desaprobados}</h1>
-                        <p class="text-muted">Aprobados/Desaprobados</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row">
-            <!-- ESTUDIANTES CON BAJA ASISTENCIA -->
-            <div class="col-md-6 mb-3">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-warning">
-                        <h6 class="mb-0">⚠️ Baja Asistencia (< 75%)</h6>
-                    </div>
-                    <div class="card-body">
-                        ${bajaAsistencia > 0 ? `
-                            <ul class="list-group">
-                                ${estudiantes
-                                    .filter(e => (e.asistencia.porcentaje || 0) < 75)
-                                    .map(e => `
-                                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            ${e.nombre}
-                                            <span class="badge bg-danger">${e.asistencia.porcentaje}%</span>
-                                        </li>
-                                    `).join('')}
-                            </ul>
-                        ` : '<p class="text-success">Todos los estudiantes tienen buena asistencia ✅</p>'}
-                    </div>
-                </div>
-            </div>
-            
-            <!-- ESTUDIANTES DESAPROBADOS -->
-            <div class="col-md-6 mb-3">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-danger text-white">
-                        <h6 class="mb-0">📉 Desaprobados (< 6)</h6>
-                    </div>
-                    <div class="card-body">
-                        ${desaprobados > 0 ? `
-                            <ul class="list-group">
-                                ${estudiantes
-                                    .filter(e => (parseFloat(e.notas.nota_final) || 0) < 6)
-                                    .map(e => `
-                                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            ${e.nombre}
-                                            <span class="badge bg-warning">${parseFloat(e.notas.nota_final) || 0}</span>
-                                        </li>
-                                    `).join('')}
-                            </ul>
-                        ` : '<p class="text-success">Todos los estudiantes están aprobados ✅</p>'}
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- LISTA COMPLETA -->
-        <div class="card shadow-sm">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">📋 Lista Completa de Estudiantes</h6>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th>Estudiante</th>
-                                <th class="text-center">Asistencia</th>
-                                <th class="text-center">Nota Final</th>
-                                <th class="text-center">Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${estudiantes.map(e => {
-                                const nota = parseFloat(e.notas.nota_final) || 0;
-                                const asistencia = e.asistencia.porcentaje || 0;
-                                
-                                let estado = '✅ Aprobado';
-                                let estadoColor = 'success';
-                                
-                                if (nota < 6) {
-                                    estado = '❌ Desaprobado';
-                                    estadoColor = 'danger';
-                                } else if (asistencia < 75) {
-                                    estado = '⚠️ Baja asistencia';
-                                    estadoColor = 'warning';
-                                }
-                                
-                                return `
-                                    <tr>
-                                        <td>${e.nombre}</td>
-                                        <td class="text-center">
-                                            <span class="badge bg-${asistencia >= 75 ? 'success' : 'warning'}">
-                                                ${asistencia}%
-                                            </span>
-                                        </td>
-                                        <td class="text-center fw-bold ${nota >= 6 ? 'text-success' : 'text-danger'}">
-                                            ${nota.toFixed(1)}
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge bg-${estadoColor}">${estado}</span>
-                                        </td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>`;
-    
-    return html;
+    if (c1 >= 7) { int1.value = ''; int1.disabled = true; int1.style.backgroundColor = '#e9ecef'; } 
+    else { int1.disabled = false; int1.style.backgroundColor = ''; }
+
+    if (c2 >= 7) { int2.value = ''; int2.disabled = true; int2.style.backgroundColor = '#e9ecef'; } 
+    else { int2.disabled = false; int2.style.backgroundColor = ''; }
 }
 
-// --- FUNCIONES DE CONTROL DE PESTAÑAS ---
+async function enviarAsistenciaDocente(idMateria) {
+    if(!usuarioActual) return;
+    const fechaInput = document.getElementById('fechaAsistenciaDocente').value;
+    if(!fechaInput) { alert("Selecciona una fecha válida"); return; }
 
-function mostrarTabDocente(tab) {
-    // Ocultar todas las pestañas
-    document.getElementById('tabAsistencia').classList.add('d-none');
-    document.getElementById('tabNotas').classList.add('d-none');
-    document.getElementById('tabResumen').classList.add('d-none');
-    
-    // Remover active de todos los tabs
-    document.querySelectorAll('#tabsDocente button').forEach(btn => {
-        btn.classList.remove('active');
+    const inputs = document.querySelectorAll('input[type=radio]:checked');
+    let listaAsistencia = [];
+    inputs.forEach(input => {
+        let dni = input.name.split('_')[1];
+        let estado = input.value;
+        listaAsistencia.push({ dni: dni, estado: estado });
     });
-    
-    // Mostrar la pestaña seleccionada
-    document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('d-none');
-    
-    // Activar el botón correspondiente
-    event.target.classList.add('active');
-}
 
-// --- FUNCIONES DE GUARDADO ---
-
-async function guardarAsistenciaDocente() {
-    if (!window.cursoActualDocente) return;
-    
-    const inputs = document.querySelectorAll('input[type="radio"]:checked');
-    let lista = [];
-    
-    inputs.forEach(inp => {
-        const dni = inp.name.split('_')[1];
-        lista.push({ 
-            dni: dni, 
-            estado: inp.value 
-        });
-    });
-    
-    const btn = document.querySelector('#tabAsistencia button');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = 'Guardando...';
-    btn.disabled = true;
-    
+    if(listaAsistencia.length === 0) return;
     try {
-        await fetch(URL_API, { 
-            method: 'POST', 
-            body: JSON.stringify({ 
+        const resp = await fetch(URL_API, {
+            method: 'POST',
+            body: JSON.stringify({
                 op: 'guardarAsistenciaDocente',
-                dniDocente: usuarioActual.dni || '',
-                idMateria: window.cursoActualDocente.idMateria,
-                asistencia: lista
+                dniDocente: usuarioActual.dni,
+                idMateria: idMateria,
+                fecha: fechaInput,
+                asistencia: listaAsistencia
             })
         });
-        
-        alert('✅ Asistencia guardada correctamente');
-        
-        // Recargar los datos
-        abrirCursoDocente(
-            window.cursoActualDocente.curso,
-            window.cursoActualDocente.idMateria,
-            window.cursoActualDocente.nombreMateria
-        );
-        
-    } catch (e) {
-        alert('Error al guardar asistencia: ' + e.message);
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    }
-}
-
-function calcularNotasAutomaticamente() {
-    if (!window.cursoActualDocente) return;
-    
-    // Calcular nota final para cada estudiante
-    window.cursoActualDocente.estudiantes.forEach(est => {
-        const dni = est.dni;
-        
-        // Obtener valores de los inputs
-        const notaC1 = parseFloat(document.querySelector(`input[data-dni="${dni}"][data-campo="nota1_C1"]`)?.value) || 0;
-        const intensif1 = parseFloat(document.querySelector(`input[data-dni="${dni}"][data-campo="intensificacion1"]`)?.value) || 0;
-        const notaC2 = parseFloat(document.querySelector(`input[data-dni="${dni}"][data-campo="nota1_C2"]`)?.value) || 0;
-        const intensif2 = parseFloat(document.querySelector(`input[data-dni="${dni}"][data-campo="intensificacion2"]`)?.value) || 0;
-        
-        // Usar intensificación si es mayor que la nota regular
-        const notaFinalC1 = intensif1 > notaC1 ? intensif1 : notaC1;
-        const notaFinalC2 = intensif2 > notaC2 ? intensif2 : notaC2;
-        
-        let notaFinalCalculada = (notaFinalC1 + notaFinalC2) / 2;
-        notaFinalCalculada = Math.round(notaFinalCalculada * 10) / 10; // Redondear a 1 decimal
-        
-        // Actualizar el span de nota final
-        document.getElementById(`nota_final_${dni}`).textContent = notaFinalCalculada.toFixed(1);
-        
-        // Si no hay nota definitiva manual, actualizarla también
-        const inputDefinitiva = document.querySelector(`input[data-dni="${dni}"][data-campo="nota_definitiva"]`);
-        if (inputDefinitiva && !inputDefinitiva.value) {
-            inputDefinitiva.value = notaFinalCalculada.toFixed(1);
+        const data = await resp.json();
+        if(data.status === 'success') {
+            alert('Asistencia guardada.');
+            document.querySelector('.nav-link.active').click(); 
         }
-    });
-    
-    alert('✅ Notas calculadas automáticamente');
+    } catch(e) { alert('Error de conexión'); }
 }
 
-async function guardarNotasDocente() {
-    if (!window.cursoActualDocente) return;
-    
-    const notas = [];
-    const estudiantes = window.cursoActualDocente.estudiantes;
-    
-    estudiantes.forEach(est => {
-        const dni = est.dni;
-        
-        // Recolectar todos los valores
-        const notaData = {
-            dni: dni,
-            nota1_C1: document.querySelector(`input[data-dni="${dni}"][data-campo="nota1_C1"]`)?.value || '',
-            intensificacion1: document.querySelector(`input[data-dni="${dni}"][data-campo="intensificacion1"]`)?.value || '',
-            nota1_C2: document.querySelector(`input[data-dni="${dni}"][data-campo="nota1_C2"]`)?.value || '',
-            intensificacion2: document.querySelector(`input[data-dni="${dni}"][data-campo="intensificacion2"]`)?.value || '',
-            diciembre: document.querySelector(`input[data-dni="${dni}"][data-campo="diciembre"]`)?.value || '',
-            febrero: document.querySelector(`input[data-dni="${dni}"][data-campo="febrero"]`)?.value || '',
-            nota_definitiva: document.querySelector(`input[data-dni="${dni}"][data-campo="nota_definitiva"]`)?.value || ''
-        };
-        
-        notas.push(notaData);
+async function guardarNotasDocente(idMateria) {
+    const filas = document.querySelectorAll('#contenedor-tabla-notas tbody tr');
+    let listaNotas = [];
+    filas.forEach(fila => {
+        listaNotas.push({
+            dni: fila.dataset.dni,
+            nota1_C1: fila.querySelector('.inp-c1').value,
+            intensificacion1: fila.querySelector('.inp-int1').value,
+            nota1_C2: fila.querySelector('.inp-c2').value,
+            intensificacion2: fila.querySelector('.inp-int2').value,
+            diciembre: fila.querySelector('.inp-dic').value,
+            febrero: fila.querySelector('.inp-feb').value
+        });
     });
-    
-    const btn = document.querySelector('#tabNotas button.btn-primary');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = 'Guardando...';
-    btn.disabled = true;
-    
+
     try {
-        await fetch(URL_API, { 
-            method: 'POST', 
-            body: JSON.stringify({ 
+        const resp = await fetch(URL_API, {
+            method: 'POST',
+            body: JSON.stringify({
                 op: 'guardarNotasMasivo',
-                idMateria: window.cursoActualDocente.idMateria,
+                idMateria: idMateria,
                 nombreDocente: usuarioActual.nombre,
-                notas: notas
+                notas: listaNotas
             })
         });
-        
-        alert('✅ Notas guardadas correctamente');
-        
-        // Recargar los datos
-        abrirCursoDocente(
-            window.cursoActualDocente.curso,
-            window.cursoActualDocente.idMateria,
-            window.cursoActualDocente.nombreMateria
-        );
-        
-    } catch (e) {
-        alert('Error al guardar notas: ' + e.message);
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    }
-}
-
-async function contactarPreceptor() {
-    try {
-        const resp = await fetch(`${URL_API}?op=getPreceptores&rol=Docente`);
-        const json = await resp.json();
-        
-        if (json.status !== 'success' || json.data.length === 0) {
-            alert('No se encontraron preceptores disponibles');
-            return;
+        const data = await resp.json();
+        if(data.status === 'success') {
+            alert('Notas guardadas.');
+            const linkActivo = document.querySelector('.nav-link.active');
+            if(linkActivo) linkActivo.click(); 
         }
-        
-        let html = `<div class="mb-3">
-                       <h6>Preceptores disponibles:</h6>
-                       <ul class="list-group">`;
-        
-        json.data.forEach(preceptor => {
-            html += `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>${preceptor.nombre}</strong><br>
-                        <small>${preceptor.email}</small>
-                    </div>
-                    <div>
-                        <a href="mailto:${preceptor.email}?subject=Consulta sobre ${window.cursoActualDocente.nombreMateria} - ${window.cursoActualDocente.curso}" 
-                           class="btn btn-sm btn-primary" target="_blank">
-                            ✉️ Email
-                        </a>
-                    </div>
-                </li>`;
-        });
-        
-        html += `</ul></div>`;
-        
-        // Mostrar modal
-        const modal = new bootstrap.Modal(document.createElement('div'));
-        modal._element.innerHTML = `
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header bg-info text-white">
-                        <h5 class="modal-title">📞 Contactar Preceptor</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        ${html}
-                        <p class="text-muted small mt-3">
-                            <strong>Curso:</strong> ${window.cursoActualDocente.curso}<br>
-                            <strong>Materia:</strong> ${window.cursoActualDocente.nombreMateria}
-                        </p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                    </div>
-                </div>
-            </div>`;
-        
-        document.body.appendChild(modal._element);
-        modal.show();
-        
-    } catch (e) {
-        alert('Error al cargar preceptores: ' + e.message);
-    }
+    } catch(e) { alert('Error de conexión'); }
 }
 
-function verMisDatosDocente() {
-    // Esta función puede mostrar los datos personales del docente
-    document.getElementById('contenido-dinamico').innerHTML = `
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">👤 Mis Datos Personales</h5>
+// --- MODAL HISTORIAL (NUEVO) ---
+async function verHistorialMateria(dni, nombreAlumno, idMateria) {
+    let modalDiv = document.getElementById('modalHistorialMateria');
+    if (!modalDiv) {
+        modalDiv = document.createElement('div');
+        modalDiv.id = 'modalHistorialMateria';
+        modalDiv.className = 'modal fade';
+        modalDiv.tabIndex = -1;
+        modalDiv.innerHTML = `
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Historial: <span id="tituloHistorialAlumno"></span></h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="card-body">
-                <div class="alert alert-info">
-                    <h6>Información del docente:</h6>
-                    <p><strong>Nombre:</strong> ${usuarioActual.nombre}</p>
-                    <p><strong>Rol:</strong> ${usuarioActual.rol}</p>
-                    <p class="text-muted">Para modificar tus datos de contacto, comunícate con la dirección.</p>
-                </div>
-                <button class="btn btn-secondary" onclick="iniciarModuloDocente()">
-                    ← Volver a mis cursos
-                </button>
+            <div class="modal-body">
+               <div id="listaHistorialMateria" class="list-group list-group-flush">
+                  <div class="text-center"><div class="spinner-border text-primary"></div></div>
+               </div>
             </div>
+          </div>
         </div>`;
-}
+        document.body.appendChild(modalDiv);
+    }
+    document.getElementById('tituloHistorialAlumno').innerText = nombreAlumno;
+    const modal = new bootstrap.Modal(modalDiv);
+    modal.show();
 
-// Agregar un event listener para calcular notas en tiempo real
-document.addEventListener('input', function(e) {
-    if (e.target.classList.contains('nota-input')) {
-        // Si es un input de nota, recalcular la nota final automáticamente
-        const dni = e.target.dataset.dni;
-        if (dni) {
-            calcularNotaIndividual(dni);
+    try {
+        const resp = await fetch(`${URL_API}?op=getHistorialMateria&dni=${dni}&idMateria=${idMateria}`);
+        const data = await resp.json();
+        const container = document.getElementById('listaHistorialMateria');
+        if (data.status === 'success' && data.data.length > 0) {
+            let html = '';
+            data.data.forEach(item => {
+                let badge = '';
+                if(item.estado === 'A') badge = '<span class="badge bg-danger">Ausente</span>';
+                else if(item.estado === 'T') badge = '<span class="badge bg-warning text-dark">Tarde</span>';
+                else if(item.estado === 'J') badge = '<span class="badge bg-success">Justificado</span>';
+                else badge = '<span class="badge bg-secondary">' + item.estado + '</span>';
+                
+                let btnJustificar = '';
+                if ((item.estado === 'A' || item.estado === 'T') && item.justificado !== 'Si') {
+                    btnJustificar = `<button class="btn btn-sm btn-outline-primary ms-2" onclick="justificarDesdeDocente(${item.fila}, '${dni}', '${idMateria}')">Justificar</button>`;
+                }
+                html += `<div class="list-group-item d-flex justify-content-between align-items-center"><div><strong>${item.fecha}</strong> ${badge}</div>${btnJustificar}</div>`;
+            });
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div class="alert alert-info">No hay inasistencias registradas en esta materia.</div>';
         }
-    }
-});
-
-function calcularNotaIndividual(dni) {
-    // Calcular solo para un estudiante específico
-    const notaC1 = parseFloat(document.querySelector(`input[data-dni="${dni}"][data-campo="nota1_C1"]`)?.value) || 0;
-    const intensif1 = parseFloat(document.querySelector(`input[data-dni="${dni}"][data-campo="intensificacion1"]`)?.value) || 0;
-    const notaC2 = parseFloat(document.querySelector(`input[data-dni="${dni}"][data-campo="nota1_C2"]`)?.value) || 0;
-    const intensif2 = parseFloat(document.querySelector(`input[data-dni="${dni}"][data-campo="intensificacion2"]`)?.value) || 0;
-    
-    // Usar intensificación si es mayor que la nota regular
-    const notaFinalC1 = intensif1 > notaC1 ? intensif1 : notaC1;
-    const notaFinalC2 = intensif2 > notaC2 ? intensif2 : notaC2;
-    
-    let notaFinalCalculada = (notaFinalC1 + notaFinalC2) / 2;
-    notaFinalCalculada = Math.round(notaFinalCalculada * 10) / 10;
-    
-    // Actualizar el span de nota final
-    const notaFinalElement = document.getElementById(`nota_final_${dni}`);
-    if (notaFinalElement) {
-        notaFinalElement.textContent = notaFinalCalculada.toFixed(1);
-    }
+    } catch(e) { document.getElementById('listaHistorialMateria').innerHTML = '<div class="text-danger">Error al cargar.</div>'; }
 }
 
-
+async function justificarDesdeDocente(fila, dni, idMateria) {
+    if(!confirm("¿Confirmas justificar esta falta?")) return;
+    try {
+        const resp = await fetch(URL_API, { method: 'POST', body: JSON.stringify({ op: 'justificarFalta', fila: fila }) });
+        const r = await resp.json();
+        if(r.status === 'success') {
+            const nombre = document.getElementById('tituloHistorialAlumno').innerText;
+            verHistorialMateria(dni, nombre, idMateria); 
+        }
+    } catch(e) { alert("Error de conexión"); }
+}
 // ==========================================
 // 4. MÓDULO DIRECTIVO: PRECEPTORES (CORREGIDO)
 // ==========================================
@@ -2435,4 +2031,5 @@ function renderModalCursosPreceptorHTML() {
       </div>
     </div>`;
 }
+
 
