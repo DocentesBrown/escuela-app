@@ -40,17 +40,17 @@ async function iniciarModuloDocente() {
 let fechaAsistenciaSeleccionada = new Date().toISOString().split('T')[0];
 
 async function abrirCursoDocente(curso, idMateria, nombreMateria) {
-    document.getElementById('contenido-dinamico').innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Cargando datos del curso...</p></div>`;
+    document.getElementById('contenido-dinamico').innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Cargando datos...</p></div>`;
     
     try {
-        const resp = await fetch(`${URL_API}?op=getEstudiantesConDatosCompletos&rol=Docente&dniDocente=${usuarioActual.dni || ''}&curso=${curso}&idMateria=${idMateria}`);
+        // Enrolamos los parámetros exactos que espera el Backend actualizado
+        const url = `${URL_API}?op=getEstudiantesConDatosCompletos&rol=Docente&dniDocente=${usuarioActual.dni}&curso=${curso}&idMateria=${idMateria}`;
+        const resp = await fetch(url);
         const json = await resp.json();
         
-        window.cursoActualDocente = { curso, idMateria, nombreMateria, estudiantes: json.data.estudiantes };
+        if (json.status !== 'success') throw new Error(json.message);
         
-        if (!document.getElementById('modalJustificarDocente')) {
-             document.body.insertAdjacentHTML('beforeend', renderModalJustificarDocenteHTML());
-        }
+        window.cursoActualDocente = { curso, idMateria, nombreMateria, estudiantes: json.data.estudiantes };  
         
         let html = `
             <div class="d-flex justify-content-between align-items-center mb-3">
