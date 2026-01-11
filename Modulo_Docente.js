@@ -18,18 +18,27 @@ async function iniciarModuloDocente() {
             return;
         }
         
+        // RENDERIZADO DE TARJETAS
         let html = `<h4 class="mb-4">🏫 Mis Cursos Asignados</h4><div class="row">`;
         json.data.forEach(grupo => {
             grupo.materias.forEach(mat => {
+                // Cantidad real calculada en backend
+                const cantAlumnos = mat.cantidadEstudiantes || 0; 
+                
                 html += `
                 <div class="col-md-4 mb-3">
                     <div class="card shadow-sm border-start border-4 border-primary h-100">
                         <div class="card-body">
                             <h5 class="card-title text-primary fw-bold">${grupo.curso}</h5>
-                            <h6 class="card-subtitle mb-2 text-muted">${mat.nombre}</h6>
-                            <p class="small text-muted mb-3">${mat.tipoAsignacion}</p>
+                            <h6 class="card-subtitle mb-2 text-dark">${mat.nombre}</h6>
+                            <p class="small text-muted mb-2">${mat.tipoAsignacion}</p>
+                            
+                            <div class="d-flex align-items-center mb-3">
+                                <span class="badge bg-info text-dark me-2">👥 ${cantAlumnos} Alumnos</span>
+                            </div>
+
                             <button onclick="cargarCursoDetalle('${grupo.curso}', '${mat.id}')" class="btn btn-outline-primary w-100">
-                                Gestionar Alumnos
+                                Gestionar
                             </button>
                         </div>
                     </div>
@@ -50,7 +59,6 @@ async function cargarCursoDetalle(curso, idMateria, fecha = null) {
     const contenedor = document.getElementById('contenido-dinamico');
     contenedor.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Obteniendo datos...</p></div>`;
     
-    // Fecha por defecto: Hoy (YYYY-MM-DD)
     const fechaQuery = fecha || new Date().toISOString().split('T')[0];
 
     try {
@@ -72,6 +80,28 @@ function renderInterfazCurso(fechaSeleccionada) {
     const d = cursoActualData;
     const contenedor = document.getElementById('contenido-dinamico');
     
+    // Inyectar HTML del Modal de Justificación si no existe
+    if (!document.getElementById('modalJustificarFalta')) {
+        document.body.insertAdjacentHTML('beforeend', `
+            <div class="modal fade" id="modalJustificarFalta" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning">
+                            <h5 class="modal-title">Justificar Inasistencias</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <h6 id="lblAlumnoJustificar" class="fw-bold mb-3"></h6>
+                            <div id="listaFaltasContainer" class="list-group">
+                                <div class="text-center"><div class="spinner-border text-warning"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+    }
+
     let html = `
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4>${d.materia.nombre} <span class="badge bg-secondary">${d.materia.curso}</span></h4>
@@ -79,36 +109,30 @@ function renderInterfazCurso(fechaSeleccionada) {
     </div>
 
     <ul class="nav nav-tabs mb-3" id="docenteTabs" role="tablist">
-        <li class="nav-item">
-            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#panel-asist" type="button">📅 Asistencia</button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#panel-notas" type="button">📊 Notas (RITE)</button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#panel-resumen" type="button">📈 Resumen</button>
-        </li>
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#panel-asist">📅 Asistencia</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#panel-notas">📊 Notas (RITE)</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#panel-resumen">📈 Resumen</button></li>
     </ul>
 
     <div class="tab-content">
         <div class="tab-pane fade show active" id="panel-asist">
-            <div class="row mb-3 align-items-end bg-light p-3 rounded mx-0">
+            <div class="row mb-3 bg-light p-3 rounded mx-0 align-items-end">
                 <div class="col-md-4">
-                    <label class="form-label fw-bold">Fecha de Registro:</label>
+                    <label class="form-label fw-bold">Fecha:</label>
                     <input type="date" class="form-control" id="fechaAsistencia" value="${fechaSeleccionada}" onchange="cambiarFechaAsistencia(this.value)">
                 </div>
                 <div class="col-md-8 text-end">
-                     <button class="btn btn-success" onclick="guardarAsistencia()">💾 Guardar Asistencia</button>
+                     <button class="btn btn-success" onclick="guardarAsistencia()">💾 Guardar del Día</button>
                 </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
                     <thead class="table-dark text-center">
                         <tr>
-                            <th>Estudiante</th>
-                            <th>Estado (${fechaSeleccionada})</th>
-                            <th>Inasistencias</th>
-                            <th>Historial</th>
+                            <th>Estudiante / Condición</th>
+                            <th>Asistencia (${fechaSeleccionada})</th>
+                            <th>Estadísticas</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-asistencia">
@@ -120,40 +144,31 @@ function renderInterfazCurso(fechaSeleccionada) {
 
         <div class="tab-pane fade" id="panel-notas">
             <div class="d-flex justify-content-end mb-2">
-                <button class="btn btn-primary" onclick="guardarNotas()">💾 Guardar Todas las Notas</button>
+                <button class="btn btn-primary" onclick="guardarNotas()">💾 Guardar Notas</button>
             </div>
             <div class="table-responsive">
                 <table class="table table-bordered table-sm align-middle text-center" style="min-width: 1000px;">
                     <thead class="table-light">
                         <tr>
-                            <th rowspan="2" class="align-middle">Estudiante</th>
+                            <th rowspan="2">Estudiante</th>
                             <th colspan="2">1° Cuatrimestre</th>
                             <th colspan="2">2° Cuatrimestre</th>
-                            <th rowspan="2" class="align-middle bg-info bg-opacity-10" style="width: 60px;">Prom</th>
-                            <th rowspan="2" class="align-middle" style="width: 60px;">Dic</th>
-                            <th rowspan="2" class="align-middle" style="width: 60px;">Feb</th>
-                            <th rowspan="2" class="align-middle bg-secondary text-white">DEFINITIVA</th>
+                            <th rowspan="2" class="bg-info bg-opacity-10">Prom</th>
+                            <th rowspan="2">Dic</th>
+                            <th rowspan="2">Feb</th>
+                            <th rowspan="2" class="bg-secondary text-white">DEFINITIVA</th>
                         </tr>
-                        <tr>
-                            <th>Reg</th><th>Int</th>
-                            <th>Reg</th><th>Int</th>
-                        </tr>
+                        <tr><th>Reg</th><th>Int</th><th>Reg</th><th>Int</th></tr>
                     </thead>
-                    <tbody id="tbody-notas">
-                        ${renderFilasNotas(d.estudiantes)}
-                    </tbody>
+                    <tbody id="tbody-notas">${renderFilasNotas(d.estudiantes)}</tbody>
                 </table>
             </div>
         </div>
 
-        <div class="tab-pane fade" id="panel-resumen">
-            ${renderResumen(d.estudiantes)}
-        </div>
+        <div class="tab-pane fade" id="panel-resumen">${renderResumen(d.estudiantes)}</div>
     </div>`;
 
     contenedor.innerHTML = html;
-    
-    // Inicializar lógica de notas visualmente
     document.querySelectorAll('.fila-notas').forEach(tr => calcularLogicaFila(tr));
 }
 
@@ -167,24 +182,110 @@ function renderFilasAsistencia(estudiantes) {
         let isP = estado === 'P' ? 'checked' : '';
         let isA = estado === 'A' ? 'checked' : '';
         
+        // Badge de condición: Si es "Recursa" o similar, color warning, sino primary/secondary
+        let colorCond = e.condicion.toLowerCase().includes('recur') ? 'bg-warning text-dark' : 'bg-light text-secondary border';
+
         return `
         <tr data-dni="${e.dni}">
-            <td>${e.nombre}</td>
+            <td>
+                <div class="fw-bold">${e.nombre}</div>
+                <span class="badge ${colorCond} rounded-pill" style="font-size: 0.75rem;">${e.condicion}</span>
+            </td>
             <td class="text-center">
                 <div class="btn-group" role="group">
                     <input type="radio" class="btn-check" name="asis_${e.dni}" id="P_${e.dni}" value="P" ${isP}>
-                    <label class="btn btn-outline-success btn-sm" for="P_${e.dni}">Presente</label>
+                    <label class="btn btn-outline-success btn-sm" for="P_${e.dni}">P</label>
 
                     <input type="radio" class="btn-check" name="asis_${e.dni}" id="A_${e.dni}" value="A" ${isA}>
-                    <label class="btn btn-outline-danger btn-sm" for="A_${e.dni}">Ausente</label>
+                    <label class="btn btn-outline-danger btn-sm" for="A_${e.dni}">A</label>
                 </div>
             </td>
-            <td class="text-center text-danger fw-bold">${e.stats.faltas}</td>
             <td class="text-center">
-                <button class="btn btn-sm btn-link" onclick="alert('Funcionalidad de historial detallado en desarrollo')">Justificar</button>
+                <div class="d-flex flex-column align-items-center">
+                    <span class="badge bg-primary mb-1">${e.stats.porcentaje}% Asist.</span>
+                    <span class="text-muted small">${e.stats.faltas} Faltas (Inj.)</span>
+                </div>
+            </td>
+            <td class="text-center">
+                <button class="btn btn-sm btn-outline-secondary" onclick="abrirModalJustificar('${e.dni}', '${e.nombre}')">
+                   📜 Historial / Justificar
+                </button>
             </td>
         </tr>`;
     }).join('');
+}
+
+async function abrirModalJustificar(dni, nombre) {
+    const modalEl = document.getElementById('modalJustificarFalta');
+    const modal = new bootstrap.Modal(modalEl);
+    document.getElementById('lblAlumnoJustificar').innerText = nombre;
+    document.getElementById('listaFaltasContainer').innerHTML = '<div class="text-center py-3"><div class="spinner-border text-warning"></div><p>Buscando inasistencias...</p></div>';
+    
+    modal.show();
+
+    try {
+        const resp = await fetch(`${URL_API}?op=getHistorialFaltasAlumno&rol=Docente&dni=${dni}&idMateria=${idMateriaActual}`);
+        const json = await resp.json();
+        
+        const container = document.getElementById('listaFaltasContainer');
+        container.innerHTML = '';
+
+        if(json.data.length === 0) {
+            container.innerHTML = '<div class="alert alert-success">¡El alumno no tiene faltas injustificadas registradas!</div>';
+        } else {
+            json.data.forEach(f => {
+                let boton = '';
+                if(f.justificado === 'Si') {
+                    boton = `<span class="badge bg-success">Justificada</span>`;
+                } else {
+                    boton = `<button class="btn btn-sm btn-warning" onclick="justificarFaltaAccion('${dni}', '${f.fechaIso}', this)">Justificar</button>`;
+                }
+
+                container.innerHTML += `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${f.fecha}</strong> <span class="badge bg-danger">${f.estado}</span>
+                    </div>
+                    <div>${boton}</div>
+                </div>`;
+            });
+        }
+    } catch(e) {
+        console.error(e);
+        document.getElementById('listaFaltasContainer').innerHTML = '<div class="alert alert-danger">Error al cargar historial.</div>';
+    }
+}
+
+async function justificarFaltaAccion(dni, fechaIso, btnElement) {
+    if(!confirm("¿Confirmar justificación para esta fecha?")) return;
+    
+    btnElement.disabled = true;
+    btnElement.innerText = "...";
+
+    try {
+        const resp = await fetch(URL_API, { 
+            method: 'POST', 
+            body: JSON.stringify({
+                op: 'justificarFaltaDocente',
+                dni: dni,
+                idMateria: idMateriaActual,
+                fechaIso: fechaIso
+            })
+        });
+        const json = await resp.json();
+        
+        if(json.status === 'success') {
+            btnElement.parentElement.innerHTML = `<span class="badge bg-success">Justificada</span>`;
+            // Recargar datos de fondo si es necesario, o esperar a que el usuario cierre el modal
+        } else {
+            alert("Error: " + json.message);
+            btnElement.disabled = false;
+            btnElement.innerText = "Justificar";
+        }
+    } catch(e) {
+        alert("Error de conexión");
+        btnElement.disabled = false;
+    }
 }
 
 function cambiarFechaAsistencia(nuevaFecha) {
