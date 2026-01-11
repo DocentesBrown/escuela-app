@@ -1,5 +1,5 @@
 // ============================================================================
-// ARCHIVO: Modulo_Docente.js (ACTUALIZADO)
+// ARCHIVO: Modulo_Docente.js
 // ============================================================================
 
 async function iniciarModuloDocente() {
@@ -25,13 +25,13 @@ async function iniciarModuloDocente() {
                         <hr>
                         <ul class="list-unstyled">`;
             cursoData.materias.forEach(m => {
-                html += `<li class="mb-2"><button class="btn btn-outline-dark w-100 text-start d-flex justify-content-between align-items-center" onclick="abrirCursoDocente('${cursoData.curso}', ${m.id}, '${m.nombre}')"><span>📚 ${m.nombre}</span> <span class="badge bg-light text-dark border">${m.tipoAsignacion}</span></button></li>`;
+                html += `<li class="mb-2"><button class="btn btn-outline-dark w-100 text-start d-flex justify-content-between align-items-center" onclick="abrirCursoDocente('${cursoData.curso}', '${m.id}', '${m.nombre}')"><span>📚 ${m.nombre}</span> <span class="badge bg-light text-dark border">${m.tipoAsignacion}</span></button></li>`;
             });
             html += `</ul></div></div></div>`;
         });
         html += `</div>`;
         
-        // AGREGAMOS EL MODAL DE JUSTIFICACION AL FINAL
+        // Inyectamos el Modal de Justificación aquí para asegurar que exista
         html += renderModalJustificarDocenteHTML();
 
         document.getElementById('contenido-dinamico').innerHTML = html;
@@ -39,7 +39,7 @@ async function iniciarModuloDocente() {
     } catch (e) { document.getElementById('contenido-dinamico').innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`; }
 }
 
-// Variable global para controlar fecha de asistencia
+// Variable global para fecha
 let fechaAsistenciaSeleccionada = new Date().toISOString().split('T')[0];
 
 async function abrirCursoDocente(curso, idMateria, nombreMateria) {
@@ -51,11 +51,14 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
         
         window.cursoActualDocente = { curso, idMateria, nombreMateria, estudiantes: json.data.estudiantes };
         
+        // Si por alguna razón se borró el modal, lo volvemos a poner
+        if (!document.getElementById('modalJustificarDocente')) {
+             document.body.insertAdjacentHTML('beforeend', renderModalJustificarDocenteHTML());
+        }
+        
         let html = `
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <h4 class="mb-0 fw-bold text-primary">${nombreMateria} <span class="text-muted fw-normal fs-6">(${curso})</span></h4>
-                </div>
+                <div><h4 class="mb-0 fw-bold text-primary">${nombreMateria} <span class="text-muted fw-normal fs-6">(${curso})</span></h4></div>
                 <button class="btn btn-secondary btn-sm" onclick="iniciarModuloDocente()">← Volver</button>
             </div>
 
@@ -83,7 +86,7 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
 
                     <div id="tabNotas" class="d-none">
                         <div class="alert alert-info small mb-2">
-                            <i class="bi bi-info-circle"></i> <b>Reglas:</b> Intensificación se habilita si nota < 7. Final >= 7 aprueba. Final < 7 habilita Diciembre (Ej: 6.50 va a Diciembre).
+                            <i class="bi bi-info-circle"></i> <b>Reglas:</b> Promedio >= 7 y cuatris aprobados -> Promociona. Si no -> Diciembre (aprueba con 4). Si no -> Febrero (aprueba con 4).
                         </div>
                         ${renderTablaNotasDocente(json.data.estudiantes)}
                     </div>
@@ -91,16 +94,11 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
             </div>`;
         document.getElementById('contenido-dinamico').innerHTML = html;
         
-        // INYECTAMOS DE NUEVO EL MODAL POR SI SE PERDIÓ AL REESCRIBIR EL HTML
-        if(!document.getElementById('modalJustificarDocente')) {
-             document.getElementById('contenido-dinamico').insertAdjacentHTML('beforeend', renderModalJustificarDocenteHTML());
-        }
-        
         setTimeout(recalcularTodoAlInicio, 500);
 
     } catch (e) { 
         console.error(e);
-        alert("Error cargando el curso. Intenta nuevamente."); 
+        alert("Error cargando el curso."); 
         iniciarModuloDocente(); 
     }
 }
@@ -108,7 +106,6 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
 function mostrarTabDocente(tab, btn) {
     document.getElementById('tabAsistencia').classList.add('d-none');
     document.getElementById('tabNotas').classList.add('d-none');
-    
     document.querySelectorAll('#tabsDocente .nav-link').forEach(b => b.classList.remove('active'));
     
     const target = tab === 'asistencia' ? 'tabAsistencia' : 'tabNotas';
@@ -116,22 +113,21 @@ function mostrarTabDocente(tab, btn) {
     btn.classList.add('active');
 }
 
-// --- LÓGICA DE ASISTENCIA ---
+// --- FUNCIONES DE ASISTENCIA ---
 
 function cambiarFechaAsistencia(nuevaFecha) {
     fechaAsistenciaSeleccionada = nuevaFecha;
-    alert(`📅 Fecha cambiada al ${nuevaFecha}.`);
 }
 
 function renderTablaAsistenciaDocente(est) {
+    // CORRECCION: Aseguramos que haya 4 columnas en THEAD y 4 en TBODY
     let html = `<div class="table-responsive"><table class="table table-hover table-striped align-middle border">
     <thead class="table-dark text-center">
         <tr>
             <th class="text-start ps-3">Estudiante</th>
             <th style="width: 80px;" class="bg-success">P</th>
             <th style="width: 80px;" class="bg-danger">A</th>
-            <th style="width: 60px;">Edit</th>
-        </tr>
+            <th style="width: 60px;">Inasist.</th> </tr>
     </thead>
     <tbody>`;
     
@@ -145,7 +141,9 @@ function renderTablaAsistenciaDocente(est) {
             <input type="radio" name="asis_${e.dni}" value="A" class="form-check-input" style="transform: scale(1.3); cursor:pointer;">
         </td>
         <td class="text-center">
-             <button class="btn btn-sm btn-outline-secondary" onclick="abrirModalJustificarDoc('${e.dni}', '${e.nombre}')" title="Ver/Justificar faltas">✏️</button>
+             <button class="btn btn-sm btn-outline-secondary border-0" onclick="abrirModalJustificarDoc('${e.dni}', '${e.nombre}')" title="Ver Historial">
+                ✏️
+             </button>
         </td>
         </tr>`;
     });
@@ -172,12 +170,12 @@ async function guardarAsistenciaDocente() {
                 asistencia: lista 
             }) 
         });
-        alert(`✅ Asistencia del ${fechaAsistenciaSeleccionada} guardada correctamente.`);
+        alert(`✅ Asistencia guardada.`);
     } catch (e) { alert('Error al guardar asistencia.'); } 
     finally { btn.disabled = false; btn.innerText = "💾 Guardar Asistencia"; }
 }
 
-// --- NUEVAS FUNCIONES: JUSTIFICACIÓN ---
+// --- MODAL Y LÓGICA DE JUSTIFICACIÓN ---
 
 function renderModalJustificarDocenteHTML() {
     return `
@@ -190,9 +188,7 @@ function renderModalJustificarDocenteHTML() {
           </div>
           <div class="modal-body">
             <p>Alumno: <b id="just_doc_nombre"></b></p>
-            <div id="lista_faltas_docente" class="list-group">
-                <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Cargando...</div>
-            </div>
+            <div id="lista_faltas_docente" class="list-group"></div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -225,7 +221,7 @@ async function abrirModalJustificarDoc(dni, nombre) {
                 </div>`;
             });
         } else {
-            divLista.innerHTML = '<div class="alert alert-success m-2">No tiene inasistencias injustificadas para esta materia.</div>';
+            divLista.innerHTML = '<div class="alert alert-success m-2 small">No tiene inasistencias injustificadas.</div>';
         }
     } catch (e) {
         document.getElementById('lista_faltas_docente').innerHTML = '<div class="text-danger">Error al cargar datos.</div>';
@@ -236,12 +232,11 @@ async function justificarFaltaAccion(fila, dni, nombre) {
     if(!confirm("¿Confirmar justificación?")) return;
     try {
         await fetch(URL_API, { method: 'POST', body: JSON.stringify({ op: 'justificarFaltaDocente', fila: fila }) });
-        abrirModalJustificarDoc(dni, nombre); // Recargar lista
+        abrirModalJustificarDoc(dni, nombre); 
     } catch (e) { alert("Error al justificar."); }
 }
 
-
-// --- LÓGICA DE NOTAS (LA CALCULADORA) ---
+// --- LÓGICA DE NOTAS (CORREGIDA AL 100%) ---
 
 function renderTablaNotasDocente(est) {
     let html = `
@@ -295,6 +290,7 @@ function calcularFila(dni) {
     const row = document.querySelector(`tr[data-dni="${dni}"]`);
     if(!row) return;
 
+    // --- OBTENER INPUTS ---
     const inN1 = row.querySelector('.n1');
     const inI1 = row.querySelector('.i1');
     const inN2 = row.querySelector('.n2');
@@ -306,34 +302,66 @@ function calcularFila(dni) {
     const spanDef = row.querySelector('.definitiva');
     const tdDef = row.querySelector('.def-cell');
 
+    // --- VALORES RAW ---
     let vN1 = parseFloat(inN1.value) || 0;
     let vN2 = parseFloat(inN2.value) || 0;
     
-    // Intensificación si < 7
-    if (vN1 > 0 && vN1 < 7) inI1.disabled = false; else { inI1.disabled = true; inI1.value = ''; }
-    if (vN2 > 0 && vN2 < 7) inI2.disabled = false; else { inI2.disabled = true; inI2.value = ''; }
+    // --- LÓGICA CUATRIMESTRES ---
+    // Regla: Nota < 7 habilita intensificación.
+    // Si la nota es 6.5, habilita. Si es 7, deshabilita.
+    
+    if (inN1.value !== "" && vN1 < 7) { 
+        inI1.disabled = false; 
+    } else { 
+        inI1.disabled = true; inI1.value = ''; 
+    }
 
+    if (inN2.value !== "" && vN2 < 7) { 
+        inI2.disabled = false; 
+    } else { 
+        inI2.disabled = true; inI2.value = ''; 
+    }
+
+    // Valores Intensificación
     let vI1 = !inI1.disabled ? (parseFloat(inI1.value) || 0) : 0;
     let vI2 = !inI2.disabled ? (parseFloat(inI2.value) || 0) : 0;
 
-    // Si recuperó (nota >= 4), usamos esa. Si no, la original.
-    let final1 = vI1 >= 4 ? vI1 : vN1;
-    let final2 = vI2 >= 4 ? vI2 : vN2;
+    // --- ESTADO DE CADA CUATRIMESTRE ---
+    // Aprobado si Nota >= 7 OR Intensificación >= 4
+    let aprobadoC1 = (vN1 >= 7) || (vI1 >= 4);
+    let aprobadoC2 = (vN2 >= 7) || (vI2 >= 4);
+
+    // --- CALCULO PROMEDIO ---
+    // Regla: "Nota final es el resultado de promediar los dos cuatrimestres"
+    // Valor efectivo para el promedio: Si aprobó intensificación (>=4), usamos esa nota.
+    // Si no fue a intensificación (tiene 7 o más), usamos la nota original.
+    // Si fue a intensificación y desaprobó (tiene 2 y 2), usamos la intensificación o la nota? 
+    // Usualmente se usa la nota más alta lograda o la de cierre. Usaremos la nota "efectiva".
+    
+    let notaEfectiva1 = (vN1 >= 7) ? vN1 : vI1; // Si < 7 usamos lo que sacó en Recup (aunque sea 0)
+    let notaEfectiva2 = (vN2 >= 7) ? vN2 : vI2;
+    
+    // Corrección para cuando aún no hay recup cargada: Usamos la nota original para proyectar el promedio
+    if (vN1 < 7 && inI1.value === "") notaEfectiva1 = vN1;
+    if (vN2 < 7 && inI2.value === "") notaEfectiva2 = vN2;
 
     let promedio = 0;
     let definitiva = "-";
 
-    if (vN1 > 0 && vN2 > 0) {
-        let calculo = (final1 + final2) / 2;
-        
-        // CORRECCIÓN PARA 6.50: No redondeamos todavía para la decisión
-        promedio = parseFloat(calculo.toFixed(2)); 
-        spanProm.innerText = promedio; // Mostramos ej: 6.50
+    if (inN1.value !== "" && inN2.value !== "") {
+        let calculo = (notaEfectiva1 + notaEfectiva2) / 2;
+        promedio = parseFloat(calculo.toFixed(2)); // Guardamos decimales para mostrar
+        spanProm.innerText = promedio;
 
-        // Si es >= 7 PROMOCIONA. Si es 6.99 o menos, DICIEMBRE.
-        if (promedio >= 7) {
-            definitiva = Math.round(promedio); // Redondeo final para nota de acta
-            if(definitiva < 7) definitiva = 7; 
+        // --- DEFINICION DE ESTATUS FINAL ---
+        // Condición Promoción: Promedio >= 7 Y ambos cuatris aprobados.
+        // Si el promedio da 8 pero desaprobó el 2do cuatri (Ej: 10 y 2), NO promociona.
+        
+        if (promedio >= 7 && aprobadoC1 && aprobadoC2) {
+            // PROMOCIONA
+            definitiva = Math.round(promedio); // Redondeo matemático (7.5 -> 8)
+            if(definitiva < 7) definitiva = 7; // Piso 7 si promociona
+            
             inDic.disabled = true; inDic.value = '';
             inFeb.disabled = true; inFeb.value = '';
         } else {
@@ -341,28 +369,39 @@ function calcularFila(dni) {
             inDic.disabled = false;
             let vDic = parseFloat(inDic.value) || 0;
             
-            if (inDic.value !== "" && vDic >= 4) {
-                definitiva = vDic; 
-                inFeb.disabled = true; inFeb.value = '';
-            } else if (inDic.value !== "" && vDic < 4) {
-                // A FEBRERO
-                inFeb.disabled = false;
-                let vFeb = parseFloat(inFeb.value) || 0;
-                if (inFeb.value !== "") {
-                     definitiva = vFeb >= 4 ? vFeb : "C.I.";
+            if (inDic.value !== "") {
+                if (vDic >= 4) {
+                    // APROBÓ DICIEMBRE -> NOTA VA A DEFINITIVA
+                    definitiva = vDic;
+                    inFeb.disabled = true; inFeb.value = '';
+                } else {
+                    // A FEBRERO
+                    inFeb.disabled = false;
+                    let vFeb = parseFloat(inFeb.value) || 0;
+                    if (inFeb.value !== "") {
+                        if (vFeb >= 4) {
+                            definitiva = vFeb;
+                        } else {
+                            definitiva = "C.I."; // Desaprobó Febrero
+                        }
+                    } else {
+                        definitiva = "-"; // Esperando nota Febrero
+                    }
                 }
             } else {
+                definitiva = "-"; // Esperando nota Diciembre
                 inFeb.disabled = true; 
             }
         }
     } else {
         spanProm.innerText = "-";
-        inDic.disabled = true; 
+        inDic.disabled = true;
         inFeb.disabled = true;
     }
 
     spanDef.innerText = definitiva;
     
+    // Colores Definitiva
     tdDef.className = "text-center fw-bold text-white def-cell";
     if (definitiva === "C.I.") tdDef.classList.add("bg-danger");
     else if (definitiva !== "-") tdDef.classList.add("bg-success");
