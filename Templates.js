@@ -224,7 +224,7 @@ function renderModalJustificarDocenteHTML() {
             <p>Alumno: <b id="just_doc_nombre"></b></p>
             <p class="small text-muted">Selecciona la fecha para justificar la falta.</p>
             <div id="lista_faltas_docente" class="list-group">
-                <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Cargando...</div>
+                <!-- Las faltas se cargarán aquí dinámicamente -->
             </div>
           </div>
           <div class="modal-footer">
