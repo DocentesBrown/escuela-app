@@ -438,8 +438,8 @@ function manejarCambioNota(dni, cuatrimestre, valor) {
     const inputIntens = row.querySelector(`.i${cuatrimestre}`);
     const nota = parseInt(valor) || 0;
     
-    // Habilitar intensificación si la nota es menor a 7
-    if (nota > 0 && nota < 7) {
+    // Habilitar intensificación si la nota es menor a 7 (incluso si es 0)
+    if (nota < 7) {
         console.log(`Habilitando intensificación ${cuatrimestre}`);
         inputIntens.disabled = false;
         inputIntens.placeholder = "Ingrese nota";
@@ -481,53 +481,69 @@ function calcularEstado(dni) {
 
     console.log(`Valores: N1=${vN1}, I1=${vI1}, N2=${vN2}, I2=${vI2}, Dic=${vDic}, Feb=${vFeb}`);
 
-    // Determinar si los cuatrimestres están aprobados
-    const aprobadoC1 = (vN1 >= 7) || (vI1 >= 4);
-    const aprobadoC2 = (vN2 >= 7) || (vI2 >= 4);
-    
-    // Calcular la NOTA EFECTIVA para cada cuatrimestre (la que se usará para el promedio)
-    // Si hay intensificación aprobada (≥4), se usa esa. Si no, se usa la nota regular si está aprobada (≥7)
+    // Determinar si los cuatrimestres están aprobados y la NOTA EFECTIVA CORRECTA
+    let aprobadoC1 = false;
+    let aprobadoC2 = false;
     let notaEfectivaC1 = 0;
     let notaEfectivaC2 = 0;
     
-    // Cuatrimestre 1
-    if (vI1 >= 4) {
-        notaEfectivaC1 = vI1; // Intensificación aprobada
-    } else if (vN1 >= 7) {
-        notaEfectivaC1 = vN1; // Nota regular aprobada
+    // CUATRIMESTRE 1
+    if (vN1 >= 7) {
+        // Nota regular aprobada
+        aprobadoC1 = true;
+        notaEfectivaC1 = vN1;
+        console.log(`C1: Aprobado con nota regular ${vN1}`);
+    } else if (vI1 >= 4) {
+        // Intensificación aprobada
+        aprobadoC1 = true;
+        notaEfectivaC1 = vI1;
+        console.log(`C1: Aprobado con intensificación ${vI1}`);
     } else if (vN1 > 0) {
-        notaEfectivaC1 = vN1; // Nota regular desaprobada (se muestra igual para el promedio)
+        // Nota regular desaprobada (sin intensificación aprobada)
+        notaEfectivaC1 = vN1;
+        console.log(`C1: Desaprobado con nota regular ${vN1}`);
     } else if (vI1 > 0) {
-        notaEfectivaC1 = vI1; // Intensificación desaprobada (se muestra igual para el promedio)
+        // Intensificación desaprobada
+        notaEfectivaC1 = vI1;
+        console.log(`C1: Desaprobado con intensificación ${vI1}`);
     }
     
-    // Cuatrimestre 2
-    if (vI2 >= 4) {
-        notaEfectivaC2 = vI2; // Intensificación aprobada
-    } else if (vN2 >= 7) {
-        notaEfectivaC2 = vN2; // Nota regular aprobada
+    // CUATRIMESTRE 2
+    if (vN2 >= 7) {
+        // Nota regular aprobada
+        aprobadoC2 = true;
+        notaEfectivaC2 = vN2;
+        console.log(`C2: Aprobado con nota regular ${vN2}`);
+    } else if (vI2 >= 4) {
+        // Intensificación aprobada
+        aprobadoC2 = true;
+        notaEfectivaC2 = vI2;
+        console.log(`C2: Aprobado con intensificación ${vI2}`);
     } else if (vN2 > 0) {
-        notaEfectivaC2 = vN2; // Nota regular desaprobada (se muestra igual para el promedio)
+        // Nota regular desaprobada (sin intensificación aprobada)
+        notaEfectivaC2 = vN2;
+        console.log(`C2: Desaprobado con nota regular ${vN2}`);
     } else if (vI2 > 0) {
-        notaEfectivaC2 = vI2; // Intensificación desaprobada (se muestra igual para el promedio)
+        // Intensificación desaprobada
+        notaEfectivaC2 = vI2;
+        console.log(`C2: Desaprobado con intensificación ${vI2}`);
     }
     
     // CALCULAR PROMEDIO - SIEMPRE QUE HAYA AL MENOS UNA NOTA EN AMBOS CUATRIMESTRES
     let promedio = 0;
     let mostrarPromedio = false;
     
-    // Verificar si hay al menos una nota en cada cuatrimestre
     const tieneNotaC1 = (vN1 > 0) || (vI1 > 0);
     const tieneNotaC2 = (vN2 > 0) || (vI2 > 0);
     
     if (tieneNotaC1 && tieneNotaC2) {
-        // Si hay notas efectivas calculadas, usarlas
-        const notaFinalC1 = notaEfectivaC1 > 0 ? notaEfectivaC1 : (vN1 > 0 ? vN1 : vI1);
-        const notaFinalC2 = notaEfectivaC2 > 0 ? notaEfectivaC2 : (vN2 > 0 ? vN2 : vI2);
-        
-        promedio = Math.round((notaFinalC1 + notaFinalC2) / 2);
-        if (promedio > 10) promedio = 10;
-        mostrarPromedio = true;
+        // Solo calcular si ambas notas efectivas tienen valor
+        if (notaEfectivaC1 > 0 && notaEfectivaC2 > 0) {
+            promedio = Math.round((notaEfectivaC1 + notaEfectivaC2) / 2);
+            if (promedio > 10) promedio = 10;
+            mostrarPromedio = true;
+            console.log(`Promedio calculado: (${notaEfectivaC1} + ${notaEfectivaC2}) / 2 = ${promedio}`);
+        }
     }
     
     // Lógica de definitiva
@@ -535,14 +551,15 @@ function calcularEstado(dni) {
     let estado = "Sin calificar";
     
     if (tieneNotaC1 && tieneNotaC2) {
-        // CASO 1: Promoción
+        // CASO 1: Promoción (ambos cuatrimestres aprobados Y promedio ≥ 7)
         if (aprobadoC1 && aprobadoC2 && promedio >= 7) {
             definitiva = promedio;
             inDic.disabled = true;
             inFeb.disabled = true;
             estado = "Promoción";
+            console.log(`Estado: Promoción con nota ${definitiva}`);
         } 
-        // CASO 2: Va a Diciembre
+        // CASO 2: Va a Diciembre (no promociona)
         else {
             inDic.disabled = false;
             
@@ -551,32 +568,38 @@ function calcularEstado(dni) {
                     definitiva = vDic;
                     inFeb.disabled = true;
                     estado = "Aprobado Dic";
+                    console.log(`Estado: Aprobado en Diciembre con ${definitiva}`);
                 } else {
                     inFeb.disabled = false;
                     if (vFeb > 0) {
                         if (vFeb >= 4) {
                             definitiva = vFeb;
                             estado = "Aprobado Feb";
+                            console.log(`Estado: Aprobado en Febrero con ${definitiva}`);
                         } else {
                             definitiva = "C.I.";
                             estado = "C.I.";
+                            console.log(`Estado: C.I.`);
                         }
                     } else {
                         estado = "En Febrero";
+                        console.log(`Estado: En Febrero`);
                     }
                 }
             } else {
                 inFeb.disabled = true;
                 estado = "En Diciembre";
+                console.log(`Estado: En Diciembre`);
             }
         }
     } else {
         inDic.disabled = true;
         inFeb.disabled = true;
         estado = "Faltan notas";
+        console.log(`Estado: Faltan notas`);
     }
 
-    // Actualizar interfaz - PROMEDIO SIEMPRE SE MUESTRA
+    // Actualizar interfaz - PROMEDIO SIEMPRE SE MUESTRA SI HAY DATOS
     if (spanProm) {
         if (mostrarPromedio && promedio > 0) {
             spanProm.innerText = promedio;
@@ -606,7 +629,7 @@ function calcularEstado(dni) {
         }
     }
     
-    console.log(`Resultado: Notas efectivas C1=${notaEfectivaC1}, C2=${notaEfectivaC2}, Prom=${promedio}, Def=${definitiva}, Estado=${estado}`);
+    console.log(`Resultado final: Nota Definitiva = ${definitiva}, Estado = ${estado}`);
     
     return {
         dni: dni,
@@ -621,6 +644,7 @@ function calcularEstado(dni) {
         estado: estado
     };
 }
+
 
 function getColorEstado(estado) {
     const colores = {
@@ -657,23 +681,20 @@ function inicializarNotas() {
             const inN2 = row.querySelector('.n2');
             const inI2 = row.querySelector('.i2');
             
+            // Habilitar intensificación si la nota regular es menor a 7
             if (inN1 && inI1) {
                 const vN1 = parseInt(inN1.value) || 0;
-                if (vN1 > 0 && vN1 < 7) {
+                if (vN1 < 7) {
                     inI1.disabled = false;
-                } else if (vN1 === 0) {
-                    // Si no hay nota, también habilitar para poder ingresar intensificación
-                    inI1.disabled = false;
+                    inI1.placeholder = "Ingrese nota";
                 }
             }
             
             if (inN2 && inI2) {
                 const vN2 = parseInt(inN2.value) || 0;
-                if (vN2 > 0 && vN2 < 7) {
+                if (vN2 < 7) {
                     inI2.disabled = false;
-                } else if (vN2 === 0) {
-                    // Si no hay nota, también habilitar para poder ingresar intensificación
-                    inI2.disabled = false;
+                    inI2.placeholder = "Ingrese nota";
                 }
             }
             
