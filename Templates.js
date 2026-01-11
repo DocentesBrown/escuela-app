@@ -210,3 +210,27 @@ function renderModalJustificacionHTML() {
       </div>
     </div>`;
 }
+
+function renderModalJustificarDocenteHTML() {
+    return `
+    <div class="modal fade" id="modalJustificarDocente" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-warning">
+            <h5 class="modal-title text-dark">Justificar Inasistencias</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p>Alumno: <b id="just_doc_nombre"></b></p>
+            <p class="small text-muted">Selecciona la fecha para justificar la falta.</p>
+            <div id="lista_faltas_docente" class="list-group">
+                <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Cargando...</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
