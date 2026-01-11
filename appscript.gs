@@ -47,7 +47,8 @@ function doGet(e) {
     
     if (op === 'getPreceptores') return getPreceptoresParaDocente();
     if (op === 'getFaltasAlumnoDocente') return getFaltasAlumnoDocente(e);
-    if (op === 'justificarFaltaDocente') return justificarFaltaDocente(e);    
+    if (op === 'justificarFaltaDocente') return justificarFaltaDocente(e);
+    if (op === 'getHistorialFaltasAlumno') return getHistorialFaltasAlumno(e.parameter.dni, e.parameter.idMateria);    
   }
 
   return responseJSON({ status: 'error', message: 'Operación no válida o permisos insuficientes' });
@@ -71,6 +72,7 @@ function doPost(e) {
   // Acciones Docentes
   if (datos.op === 'guardarNotasMasivo') return guardarNotasMasivo(datos);
   if (datos.op === 'guardarAsistenciaDocente') return guardarAsistenciaDocente(datos);
+  if (datos.op === 'justificarFaltaDocente') return justificarFaltaDocente(datos);
 
   return responseJSON({ status: 'error', message: 'Acción POST no válida' });
 }
@@ -367,48 +369,50 @@ function getCursosDocente(dniDocente) {
   try {
     const ss = SpreadsheetApp.openById(ID_HOJA);
     const sheetMaterias = ss.getSheetByName('Materias');
+    const sheetListado = ss.getSheetByName('Listado');
     
     if (!sheetMaterias) return responseJSON({ status: 'error', message: 'Hoja Materias no encontrada' });
     
-    const dataMaterias = sheetMaterias.getDataRange().getValues().slice(1); // Saltar cabecera
-    
-    // Filtrar materias por DNI del docente (Columna C -> índice 2)
+    // 1. Obtener Materias del Docente
+    const dataMaterias = sheetMaterias.getDataRange().getValues().slice(1);
     const materiasDocente = dataMaterias.filter(fila => String(fila[2] || '').trim() === String(dniDocente).trim());
     
-    if (materiasDocente.length === 0) {
-      return responseJSON({ status: 'success', data: [], message: 'No tienes materias asignadas' });
-    }
+    if (materiasDocente.length === 0) return responseJSON({ status: 'success', data: [], message: 'No tienes materias' });
     
-    // Agrupar por curso
+    // 2. Agrupar por Curso
     const cursos = {};
     materiasDocente.forEach(m => {
-      const curso = String(m[3] || '').trim(); // Col D
+      const curso = String(m[3] || '').trim();
+      const nombreMat = String(m[1]).trim();
       if (!curso) return;
       
-      if (!cursos[curso]) {
-        cursos[curso] = { curso: curso, materias: [], totalEstudiantes: 0 };
-      }
+      if (!cursos[curso]) cursos[curso] = { curso: curso, materias: [] };
       
       cursos[curso].materias.push({
         id: m[0],
-        nombre: String(m[1]),
-        tipoAsignacion: m[5]
+        nombre: nombreMat,
+        tipoAsignacion: m[5],
+        nombreNormalizado: normalizarTexto(nombreMat.split('[')[0]) // Para búsqueda
       });
     });
-    
-    // Calcular cantidad de alumnos (aproximado basado en el curso)
-    // Para exactitud, deberíamos cruzar con 'Listado', pero esto es visual para el dashboard
-    const dataAlumnos = ss.getSheetByName('Listado').getDataRange().getValues();
-    Object.keys(cursos).forEach(k => {
-        // Contamos cuántos alumnos tienen asignado este curso en Listado (Col C -> índice 2, ajustar según tu hoja real)
-        // Si en Listado no hay col curso explicita, el conteo será 0 hasta entrar al detalle.
-        // Aquí asumimos una búsqueda simple para rendimiento.
-        let count = 0;
-        for(let i=1; i<dataAlumnos.length; i++) {
-            // Buscamos el curso dentro de la fila del alumno (simplificado)
-            if(dataAlumnos[i].join(' ').includes(k)) count++; 
-        }
-        cursos[k].totalEstudiantes = count;
+
+    // 3. Contar estudiantes REALES por materia (Cruzando con Listado)
+    let dataListado = [];
+    if (sheetListado) dataListado = sheetListado.getDataRange().getValues().slice(1);
+
+    Object.values(cursos).forEach(grupo => {
+        grupo.materias.forEach(mat => {
+            // Contamos cuántos alumnos tienen esta materia asignada en sus columnas de materias
+            let contador = 0;
+            dataListado.forEach(fila => {
+                // Columnas C a N (índices 2 a 13) son las materias
+                const materiasAlumno = fila.slice(2, 14).map(c => normalizarTexto(c));
+                if (materiasAlumno.some(m => m.includes(mat.nombreNormalizado))) {
+                    contador++;
+                }
+            });
+            mat.cantidadEstudiantes = contador; // Guardamos el dato
+        });
     });
     
     return responseJSON({ status: 'success', data: Object.values(cursos) });
@@ -424,62 +428,59 @@ function getEstudiantesConDatosCompletos(dniDocente, curso, idMateria, fechaAsis
     
     // 1. INFO MATERIA
     const sheetMaterias = ss.getSheetByName('Materias');
-    const dataMaterias = sheetMaterias.getDataRange().getValues();
-    // Buscamos la materia por ID (Columna A)
-    const materiaRow = dataMaterias.find(r => String(r[0]) === String(idMateria));
-    
+    const materiaRow = sheetMaterias.getDataRange().getValues().find(r => String(r[0]) === String(idMateria));
     if (!materiaRow) return responseJSON({ status: 'error', message: 'Materia no encontrada' });
     
     const nombreMateriaReal = materiaRow[1];
-    // Normalizamos el nombre: quitamos lo que está entre corchetes [] y las tildes
-    const nombreBusqueda = normalizarTexto(nombreMateriaReal.split('[')[0]);
+    const nombreBusqueda = normalizarTexto(nombreMateriaReal.split('[')[0]); // "matematica"
 
-    // 2. BUSCAR ALUMNOS EN 'LISTADO'
+    // 2. BUSCAR ALUMNOS + CONDICIÓN (Cursa/Recursa)
     const sheetListado = ss.getSheetByName('Listado');
-    if (!sheetListado) return responseJSON({ status: 'error', message: 'Falta hoja Listado' });
-
-    const dataListado = sheetListado.getDataRange().getValues().slice(1); // Saltar cabecera
+    const dataListado = sheetListado.getDataRange().getValues().slice(1);
     let estudiantes = [];
 
     dataListado.forEach(fila => {
-        // Obtenemos las materias asignadas al alumno (Columnas C a N -> índices 2 a 13)
-        // Y las normalizamos todas para comparar sin errores
-        const materiasAlumno = fila.slice(2, 14).map(c => normalizarTexto(c));
-        
-        // Verificamos si alguna de las materias del alumno COINCIDE con la que buscamos
-        const tieneMateria = materiasAlumno.some(m => m.includes(nombreBusqueda));
-        
+        // Buscamos la celda exacta que contiene la materia para extraer la condición
+        // La celda suele ser: "Matemática - Recursante" o "Matemática [Cursa]"
+        const celdasMaterias = fila.slice(2, 14);
+        let condicionEncontrada = "Cursa"; // Valor por defecto
+        let tieneMateria = false;
+
+        for (let celda of celdasMaterias) {
+            let textoCelda = normalizarTexto(celda);
+            if (textoCelda.includes(nombreBusqueda)) {
+                tieneMateria = true;
+                // Intentar extraer condición basada en guión "-" o corchetes "[]"
+                // Ejemplo: "Historia - Recursa" -> split('-')[1] = " Recursa"
+                if (String(celda).includes('-')) {
+                    condicionEncontrada = String(celda).split('-')[1].trim();
+                } else if (String(celda).includes('[')) {
+                     // Ejemplo: "Historia [Pendiente]"
+                    condicionEncontrada = String(celda).match(/\[(.*?)\]/)[1];
+                }
+                break; // Ya encontramos la materia, dejamos de buscar en esta fila
+            }
+        }
+
         if (tieneMateria) {
-            estudiantes.push({ dni: fila[0], nombre: fila[1] });
+            estudiantes.push({ 
+                dni: fila[0], 
+                nombre: fila[1], 
+                condicion: condicionEncontrada 
+            });
         }
     });
 
-    // Si aún así no encuentra, devolvemos array vacío pero sin error
-    if (estudiantes.length === 0) {
-        return responseJSON({ 
-            status: 'success', 
-            data: { 
-                estudiantes: [], 
-                materia: { id: idMateria, nombre: nombreMateriaReal, curso: curso }, 
-                fechaVisualizando: '' 
-            },
-            message: 'No se encontraron alumnos con esta materia asignada.'
-        });
-    }
+    if (estudiantes.length === 0) return responseJSON({ status: 'success', data: { estudiantes: [] } });
 
-    // 3. OBTENER NOTAS (Hoja 'Notas')
+    // 3. OBTENER NOTAS
     let sheetNotas = ss.getSheetByName('Notas');
     if (!sheetNotas) { sheetNotas = ss.insertSheet('Notas'); sheetNotas.appendRow(['ID_Materia', 'DNI', 'JSON']); }
-    
     const dataNotas = sheetNotas.getDataRange().getValues();
     const notasMap = {};
-    dataNotas.forEach(row => {
-        if (String(row[0]) === String(idMateria)) {
-            notasMap[String(row[1])] = row[2]; 
-        }
-    });
+    dataNotas.forEach(row => { if (String(row[0]) === String(idMateria)) notasMap[String(row[1])] = row[2]; });
 
-    // 4. OBTENER ASISTENCIA (Hoja 'Asistencia')
+    // 4. OBTENER ASISTENCIA (Porcentajes y Estado del día)
     const sheetAsis = ss.getSheetByName('Asistencia');
     const dataAsis = sheetAsis ? sheetAsis.getDataRange().getValues() : [];
     
@@ -492,36 +493,55 @@ function getEstudiantesConDatosCompletos(dniDocente, curso, idMateria, fechaAsis
 
     for (let i = 1; i < dataAsis.length; i++) {
         const row = dataAsis[i];
-        // Validamos que la fila tenga datos suficientes para evitar errores
         if (row.length > 5 && String(row[5]) === String(idMateria)) {
-            const fechaRow = Utilities.formatDate(new Date(row[0]), Session.getScriptTimeZone(), "yyyy-MM-dd");
             const dni = String(row[1]);
             const estado = row[2];
+            const justificado = row[3];
+            const fechaRow = Utilities.formatDate(new Date(row[0]), Session.getScriptTimeZone(), "yyyy-MM-dd");
             
+            // Estado para el selector de fecha (si vino o no ese día)
             if (fechaRow === fechaQuery) {
-                asistenciaMap[dni] = { estado: estado, justificado: row[3] };
+                asistenciaMap[dni] = { estado: estado, justificado: justificado };
             }
 
-            if (!statsMap[dni]) statsMap[dni] = { P: 0, A: 0, total: 0 };
-            statsMap[dni].total++;
-            if (estado === 'P') statsMap[dni].P++;
-            // Consideramos falta si es Ausente y NO está justificado
-            if (estado === 'A' && row[3] !== 'Si') statsMap[dni].A++; 
+            // Estadísticas globales
+            if (!statsMap[dni]) statsMap[dni] = { P: 0, A: 0, Total: 0 };
+            statsMap[dni].Total++;
+            
+            if (estado === 'P') {
+                statsMap[dni].P++;
+            } else if (estado === 'A' || estado === 'T') { 
+                // Consideramos Ausente para el porcentaje si es A o Tardanza (puedes ajustar pesos)
+                // Si NO está justificado, cuenta como falta para el contador de faltas
+                if (justificado !== 'Si') statsMap[dni].A++;
+            }
+            // Si está justificado, no suma a 'A' (Faltas), pero sí reduce el % de presencia real? 
+            // Usualmente: % Asistencia = (Presentes / Total Clases) * 100.
         }
     }
 
-    // 5. COMBINAR TODO
+    // 5. COMBINAR
     const resultado = estudiantes.map(est => {
         const jsonNotas = notasMap[est.dni] ? JSON.parse(notasMap[est.dni]) : null;
-        const stats = statsMap[est.dni] || { P: 0, A: 0, total: 0 };
-        const porc = stats.total > 0 ? Math.round((stats.P / stats.total) * 100) : 100;
+        const stats = statsMap[est.dni] || { P: 0, A: 0, Total: 0 };
+        
+        // Cálculo de porcentaje
+        let porcentaje = 100;
+        if (stats.Total > 0) {
+            porcentaje = Math.round((stats.P / stats.Total) * 100);
+        }
 
         return {
             dni: est.dni,
             nombre: est.nombre,
+            condicion: est.condicion, // <--- DATO AGREGADO
             notas: jsonNotas || { n1: '', i1: '', n2: '', i2: '', dic: '', feb: '', def: '' },
             asistenciaDia: asistenciaMap[est.dni] || { estado: '', justificado: '' },
-            stats: { porcentaje: porc, faltas: stats.A, totalClases: stats.total }
+            stats: { 
+                porcentaje: porcentaje, 
+                faltas: stats.A, // Cantidad de injustificadas
+                totalClases: stats.Total 
+            }
         };
     });
 
@@ -540,7 +560,6 @@ function getEstudiantesConDatosCompletos(dniDocente, curso, idMateria, fechaAsis
     return responseJSON({ status: 'error', message: 'Error Backend: ' + error.toString() });
   }
 }
-
 
 
 function guardarNotasMasivo(datos) {
@@ -616,50 +635,67 @@ function getPreceptoresParaDocente() {
   return responseJSON({ status: 'success', data: preceptores });
 }
 
-function getFaltasAlumnoDocente(e) {
-  const dniAlumno = e.parameter.dni;
-  const idMateria = String(e.parameter.idMateria);
-  
-  const ss = SpreadsheetApp.openById(ID_HOJA);
-  const sheet = ss.getSheetByName('Asistencia');
-  const data = sheet.getDataRange().getValues();
-  
-  let faltas = [];
-  
-  // Asumimos columnas Asistencia: 
-  // 0:Fecha, 1:DNI_Alumno, 2:Estado, 3:Justificado(Si/No), 4:DNI_Doc, 5:ID_Materia
-  
-  for (let i = 1; i < data.length; i++) {
-    // Filtramos: Que sea el alumno, que sea la materia, que esté Ausente ('A') y NO justificado ('No')
-    if (String(data[i][1]) === String(dniAlumno) && 
-        String(data[i][5]) === idMateria && 
-        data[i][2] === 'A' && 
-        data[i][3] === 'No') {
-      
-      let fechaRaw = new Date(data[i][0]);
-      let fechaStr = Utilities.formatDate(fechaRaw, Session.getScriptTimeZone(), "dd/MM/yyyy");
-      
-      faltas.push({
-        fila: i + 1, // Guardamos el número de fila para editarla rápido después
-        fecha: fechaStr
-      });
+function getHistorialFaltasAlumno(dni, idMateria) {
+    const ss = SpreadsheetApp.openById(ID_HOJA);
+    const sheet = ss.getSheetByName('Asistencia');
+    const data = sheet.getDataRange().getValues();
+    let historial = [];
+
+    // Col 0:Fecha, 1:DNI, 2:Estado, 3:Justificado, 5:ID_Materia
+    for(let i=1; i<data.length; i++) {
+        if(String(data[i][1]) === String(dni) && String(data[i][5]) === String(idMateria)) {
+            // Solo nos interesan Ausentes o Tardanzas
+            if (data[i][2] === 'A' || data[i][2] === 'T') {
+                let f = new Date(data[i][0]);
+                let fechaStr = Utilities.formatDate(f, Session.getScriptTimeZone(), "dd/MM/yyyy");
+                let fechaIso = Utilities.formatDate(f, Session.getScriptTimeZone(), "yyyy-MM-dd"); // Para ID
+                
+                historial.push({
+                    fecha: fechaStr,
+                    fechaIso: fechaIso,
+                    estado: data[i][2],
+                    justificado: data[i][3] // 'Si' o 'No'
+                });
+            }
+        }
     }
-  }
-  
-  return responseJSON({ status: 'success', data: faltas });
+    // Ordenar por fecha descendente
+    return responseJSON({ status: 'success', data: historial.reverse() });
 }
 
-function justificarFaltaDocente(e) {
-  // Simplificado: Justifica buscando la falta por DNI, Materia y Fecha aproximada (o recibiendo fila si es posible)
-  // Aquí asumimos que el frontend envía la fecha para buscar y marcar "Si" en justificado.
-  return responseJSON({ status: 'success', message: 'Función de justificación pendiente de enlace con ID de fila específico.' });
+function justificarFaltaDocente(datos) {
+    // datos = { dni, idMateria, fechaIso ('YYYY-MM-DD') }
+    const ss = SpreadsheetApp.openById(ID_HOJA);
+    const sheet = ss.getSheetByName('Asistencia');
+    const data = sheet.getDataRange().getValues();
+    const fechaTarget = datos.fechaIso; 
+    let justificada = false;
+
+    for(let i=1; i<data.length; i++) {
+        let fRow = Utilities.formatDate(new Date(data[i][0]), Session.getScriptTimeZone(), "yyyy-MM-dd");
+        
+        if (String(data[i][1]) === String(datos.dni) && 
+            String(data[i][5]) === String(datos.idMateria) &&
+            fRow === fechaTarget) {
+            
+            // Encontrada la falta -> Justificar
+            sheet.getRange(i+1, 4).setValue('Si'); // Columna D (4) es Justificado
+            // Opcional: Cambiar estado a 'J' si usas esa letra
+            // sheet.getRange(i+1, 3).setValue('J'); 
+            justificada = true;
+            break;
+        }
+    }
+
+    if(justificada) return responseJSON({ status: 'success', message: 'Falta justificada correctamente.' });
+    return responseJSON({ status: 'error', message: 'No se encontró el registro de falta para esa fecha.' });
 }
 
 function normalizarTexto(texto) {
   if (!texto) return "";
   return String(texto)
     .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Elimina tildes y diacríticos
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .trim();
 }
 
