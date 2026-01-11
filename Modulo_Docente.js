@@ -18,13 +18,9 @@ async function iniciarModuloDocente() {
             return;
         }
         
-        // RENDERIZADO DE TARJETAS
         let html = `<h4 class="mb-4">🏫 Mis Cursos Asignados</h4><div class="row">`;
         json.data.forEach(grupo => {
             grupo.materias.forEach(mat => {
-                // Cantidad real calculada en backend
-                const cantAlumnos = mat.cantidadEstudiantes || 0; 
-                
                 html += `
                 <div class="col-md-4 mb-3">
                     <div class="card shadow-sm border-start border-4 border-primary h-100">
@@ -32,12 +28,8 @@ async function iniciarModuloDocente() {
                             <h5 class="card-title text-primary fw-bold">${grupo.curso}</h5>
                             <h6 class="card-subtitle mb-2 text-dark">${mat.nombre}</h6>
                             <p class="small text-muted mb-2">${mat.tipoAsignacion}</p>
-                            
-                            <div class="d-flex align-items-center mb-3">
-                                <span class="badge bg-info text-dark me-2">👥 ${cantAlumnos} Alumnos</span>
-                            </div>
-
-                            <button onclick="cargarCursoDetalle('${grupo.curso}', '${mat.id}')" class="btn btn-outline-primary w-100">
+                            <span class="badge bg-info text-dark">👥 ${mat.cantidadEstudiantes || 0} Alumnos</span>
+                            <button onclick="cargarCursoDetalle('${grupo.curso}', '${mat.id}')" class="btn btn-outline-primary w-100 mt-3">
                                 Gestionar
                             </button>
                         </div>
@@ -49,8 +41,7 @@ async function iniciarModuloDocente() {
         contenedor.innerHTML = html;
 
     } catch (e) {
-        console.error(e);
-        contenedor.innerHTML = `<div class="alert alert-danger">Error al cargar cursos.</div>`;
+        contenedor.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
     }
 }
 
@@ -80,26 +71,23 @@ function renderInterfazCurso(fechaSeleccionada) {
     const d = cursoActualData;
     const contenedor = document.getElementById('contenido-dinamico');
     
-    // Inyectar HTML del Modal de Justificación si no existe
+    // Inyectar HTML Modal Justificar si no existe
     if (!document.getElementById('modalJustificarFalta')) {
         document.body.insertAdjacentHTML('beforeend', `
-            <div class="modal fade" id="modalJustificarFalta" tabindex="-1" aria-hidden="true">
+            <div class="modal fade" id="modalJustificarFalta" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-warning">
-                            <h5 class="modal-title">Justificar Inasistencias</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <h5 class="modal-title">Justificar Inasistencia</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
-                            <h6 id="lblAlumnoJustificar" class="fw-bold mb-3"></h6>
-                            <div id="listaFaltasContainer" class="list-group">
-                                <div class="text-center"><div class="spinner-border text-warning"></div></div>
-                            </div>
+                            <h6 id="lblAlumnoJustificar" class="fw-bold"></h6>
+                            <div id="listaFaltasContainer" class="list-group mt-3"></div>
                         </div>
                     </div>
                 </div>
-            </div>
-        `);
+            </div>`);
     }
 
     let html = `
@@ -108,9 +96,9 @@ function renderInterfazCurso(fechaSeleccionada) {
         <button class="btn btn-sm btn-secondary" onclick="iniciarModuloDocente()">⬅ Volver</button>
     </div>
 
-    <ul class="nav nav-tabs mb-3" id="docenteTabs" role="tablist">
+    <ul class="nav nav-tabs mb-3">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#panel-asist">📅 Asistencia</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#panel-notas">📊 Notas (RITE)</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#panel-notas">📊 Notas</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#panel-resumen">📈 Resumen</button></li>
     </ul>
 
@@ -118,45 +106,31 @@ function renderInterfazCurso(fechaSeleccionada) {
         <div class="tab-pane fade show active" id="panel-asist">
             <div class="row mb-3 bg-light p-3 rounded mx-0 align-items-end">
                 <div class="col-md-4">
-                    <label class="form-label fw-bold">Fecha:</label>
-                    <input type="date" class="form-control" id="fechaAsistencia" value="${fechaSeleccionada}" onchange="cambiarFechaAsistencia(this.value)">
+                    <label class="fw-bold">Fecha:</label>
+                    <input type="date" class="form-control" id="fechaAsistencia" value="${fechaSeleccionada}" onchange="cargarCursoDetalle('${d.materia.curso}', '${d.materia.id}', this.value)">
                 </div>
                 <div class="col-md-8 text-end">
-                     <button class="btn btn-success" onclick="guardarAsistencia()">💾 Guardar del Día</button>
+                     <button class="btn btn-success" onclick="guardarAsistencia()">💾 Guardar Asistencia</button>
                 </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
                     <thead class="table-dark text-center">
-                        <tr>
-                            <th>Estudiante / Condición</th>
-                            <th>Asistencia (${fechaSeleccionada})</th>
-                            <th>Estadísticas</th>
-                            <th>Acciones</th>
-                        </tr>
+                        <tr><th>Estudiante</th><th>Asistencia (${fechaSeleccionada})</th><th>Estadísticas</th><th>Acción</th></tr>
                     </thead>
-                    <tbody id="tbody-asistencia">
-                        ${renderFilasAsistencia(d.estudiantes)}
-                    </tbody>
+                    <tbody id="tbody-asistencia">${renderFilasAsistencia(d.estudiantes)}</tbody>
                 </table>
             </div>
         </div>
 
         <div class="tab-pane fade" id="panel-notas">
-            <div class="d-flex justify-content-end mb-2">
-                <button class="btn btn-primary" onclick="guardarNotas()">💾 Guardar Notas</button>
-            </div>
+            <div class="d-flex justify-content-end mb-2"><button class="btn btn-primary" onclick="guardarNotas()">💾 Guardar Notas</button></div>
             <div class="table-responsive">
                 <table class="table table-bordered table-sm align-middle text-center" style="min-width: 1000px;">
                     <thead class="table-light">
                         <tr>
-                            <th rowspan="2">Estudiante</th>
-                            <th colspan="2">1° Cuatrimestre</th>
-                            <th colspan="2">2° Cuatrimestre</th>
-                            <th rowspan="2" class="bg-info bg-opacity-10">Prom</th>
-                            <th rowspan="2">Dic</th>
-                            <th rowspan="2">Feb</th>
-                            <th rowspan="2" class="bg-secondary text-white">DEFINITIVA</th>
+                            <th rowspan="2">Estudiante</th><th colspan="2">1° Cuat</th><th colspan="2">2° Cuat</th>
+                            <th rowspan="2">Prom</th><th rowspan="2">Dic</th><th rowspan="2">Feb</th><th rowspan="2">Def</th>
                         </tr>
                         <tr><th>Reg</th><th>Int</th><th>Reg</th><th>Int</th></tr>
                     </thead>
@@ -176,116 +150,78 @@ function renderInterfazCurso(fechaSeleccionada) {
 
 function renderFilasAsistencia(estudiantes) {
     if(!estudiantes.length) return '<tr><td colspan="4">No hay estudiantes.</td></tr>';
-    
     return estudiantes.map(e => {
         let estado = e.asistenciaDia.estado || ''; 
         let isP = estado === 'P' ? 'checked' : '';
         let isA = estado === 'A' ? 'checked' : '';
-        
-        // Badge de condición: Si es "Recursa" o similar, color warning, sino primary/secondary
         let colorCond = e.condicion.toLowerCase().includes('recur') ? 'bg-warning text-dark' : 'bg-light text-secondary border';
 
         return `
         <tr data-dni="${e.dni}">
-            <td>
-                <div class="fw-bold">${e.nombre}</div>
-                <span class="badge ${colorCond} rounded-pill" style="font-size: 0.75rem;">${e.condicion}</span>
-            </td>
+            <td><div class="fw-bold">${e.nombre}</div><span class="badge ${colorCond} rounded-pill" style="font-size:0.7em">${e.condicion}</span></td>
             <td class="text-center">
-                <div class="btn-group" role="group">
-                    <input type="radio" class="btn-check" name="asis_${e.dni}" id="P_${e.dni}" value="P" ${isP}>
-                    <label class="btn btn-outline-success btn-sm" for="P_${e.dni}">P</label>
-
-                    <input type="radio" class="btn-check" name="asis_${e.dni}" id="A_${e.dni}" value="A" ${isA}>
-                    <label class="btn btn-outline-danger btn-sm" for="A_${e.dni}">A</label>
+                <div class="btn-group">
+                    <input type="radio" class="btn-check" name="asis_${e.dni}" id="P_${e.dni}" value="P" ${isP}><label class="btn btn-outline-success btn-sm" for="P_${e.dni}">P</label>
+                    <input type="radio" class="btn-check" name="asis_${e.dni}" id="A_${e.dni}" value="A" ${isA}><label class="btn btn-outline-danger btn-sm" for="A_${e.dni}">A</label>
                 </div>
             </td>
             <td class="text-center">
-                <div class="d-flex flex-column align-items-center">
-                    <span class="badge bg-primary mb-1">${e.stats.porcentaje}% Asist.</span>
-                    <span class="text-muted small">${e.stats.faltas} Faltas (Inj.)</span>
-                </div>
+                <span class="badge bg-primary">${e.stats.porcentaje}% Asist.</span><br>
+                <span class="text-danger small fw-bold">${e.stats.faltas} Injust.</span>
             </td>
             <td class="text-center">
-                <button class="btn btn-sm btn-outline-secondary" onclick="abrirModalJustificar('${e.dni}', '${e.nombre}')">
-                   📜 Historial / Justificar
-                </button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="abrirModalJustificar('${e.dni}', '${e.nombre}')">📜 Justificar</button>
             </td>
         </tr>`;
     }).join('');
 }
 
 async function abrirModalJustificar(dni, nombre) {
-    const modalEl = document.getElementById('modalJustificarFalta');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(document.getElementById('modalJustificarFalta'));
     document.getElementById('lblAlumnoJustificar').innerText = nombre;
-    document.getElementById('listaFaltasContainer').innerHTML = '<div class="text-center py-3"><div class="spinner-border text-warning"></div><p>Buscando inasistencias...</p></div>';
-    
+    document.getElementById('listaFaltasContainer').innerHTML = '<div class="text-center"><div class="spinner-border text-warning"></div></div>';
     modal.show();
 
     try {
         const resp = await fetch(`${URL_API}?op=getHistorialFaltasAlumno&rol=Docente&dni=${dni}&idMateria=${idMateriaActual}`);
         const json = await resp.json();
-        
         const container = document.getElementById('listaFaltasContainer');
         container.innerHTML = '';
 
         if(json.data.length === 0) {
-            container.innerHTML = '<div class="alert alert-success">¡El alumno no tiene faltas injustificadas registradas!</div>';
+            container.innerHTML = '<div class="alert alert-success">No hay inasistencias injustificadas.</div>';
         } else {
             json.data.forEach(f => {
-                let boton = '';
-                if(f.justificado === 'Si') {
-                    boton = `<span class="badge bg-success">Justificada</span>`;
-                } else {
-                    boton = `<button class="btn btn-sm btn-warning" onclick="justificarFaltaAccion('${dni}', '${f.fechaIso}', this)">Justificar</button>`;
-                }
-
+                let btn = f.justificado === 'Si' 
+                    ? `<span class="badge bg-success">Justificada</span>` 
+                    : `<button class="btn btn-sm btn-warning" onclick="justificarAccion('${dni}', '${f.fechaIso}', this)">Justificar</button>`;
+                
                 container.innerHTML += `
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>${f.fecha}</strong> <span class="badge bg-danger">${f.estado}</span>
-                    </div>
-                    <div>${boton}</div>
+                    <span>${f.fecha} <span class="badge bg-danger">${f.estado}</span></span>
+                    ${btn}
                 </div>`;
             });
         }
-    } catch(e) {
-        console.error(e);
-        document.getElementById('listaFaltasContainer').innerHTML = '<div class="alert alert-danger">Error al cargar historial.</div>';
-    }
+    } catch(e) { console.error(e); }
 }
 
-async function justificarFaltaAccion(dni, fechaIso, btnElement) {
-    if(!confirm("¿Confirmar justificación para esta fecha?")) return;
-    
-    btnElement.disabled = true;
-    btnElement.innerText = "...";
-
+async function justificarAccion(dni, fechaIso, btn) {
+    if(!confirm("¿Justificar esta falta?")) return;
+    btn.disabled = true;
     try {
-        const resp = await fetch(URL_API, { 
-            method: 'POST', 
-            body: JSON.stringify({
-                op: 'justificarFaltaDocente',
-                dni: dni,
-                idMateria: idMateriaActual,
-                fechaIso: fechaIso
-            })
-        });
+        const resp = await fetch(URL_API, { method: 'POST', body: JSON.stringify({op: 'justificarFaltaDocente', dni, idMateria: idMateriaActual, fechaIso}) });
         const json = await resp.json();
-        
         if(json.status === 'success') {
-            btnElement.parentElement.innerHTML = `<span class="badge bg-success">Justificada</span>`;
-            // Recargar datos de fondo si es necesario, o esperar a que el usuario cierre el modal
+            btn.parentElement.innerHTML = `<span class="badge bg-success">Justificada</span>`;
+            // RECARGAMOS LOS DATOS DETRÁS PARA ACTUALIZAR EL CONTADOR
+            const fechaActualInput = document.getElementById('fechaAsistencia').value;
+            cargarCursoDetalle(cursoActualData.materia.curso, idMateriaActual, fechaActualInput);
         } else {
             alert("Error: " + json.message);
-            btnElement.disabled = false;
-            btnElement.innerText = "Justificar";
+            btn.disabled = false;
         }
-    } catch(e) {
-        alert("Error de conexión");
-        btnElement.disabled = false;
-    }
+    } catch(e) { alert("Error de conexión"); }
 }
 
 function cambiarFechaAsistencia(nuevaFecha) {
@@ -474,25 +410,26 @@ async function guardarNotas() {
 }
 
 function renderResumen(estudiantes) {
-    let aprobados = 0;
-    let recursantes = 0;
-    let totalAsist = 0;
+    if (!estudiantes || estudiantes.length === 0) return '<div class="alert alert-info">Sin datos.</div>';
+
+    let aprobados = 0, recursantes = 0, totalAsist = 0;
     
     estudiantes.forEach(e => {
-        const def = e.notas?.def;
-        // Consideramos aprobado si es número >= 4
+        // Verificar existencia de notas
+        const def = e.notas && e.notas.def ? e.notas.def : '-';
+        
         if (!isNaN(parseFloat(def)) && parseFloat(def) >= 4) aprobados++;
         if (def === 'C.I.') recursantes++;
         
         totalAsist += (e.stats.porcentaje || 0);
     });
-    
+
     const promAsist = estudiantes.length ? Math.round(totalAsist / estudiantes.length) : 0;
 
     return `
     <div class="row g-3 text-center">
         <div class="col-md-4"><div class="card p-3 bg-success text-white"><h3>${aprobados}</h3><p>Aprobados</p></div></div>
-        <div class="col-md-4"><div class="card p-3 bg-danger text-white"><h3>${recursantes}</h3><p>No Aprobados (C.I.)</p></div></div>
+        <div class="col-md-4"><div class="card p-3 bg-danger text-white"><h3>${recursantes}</h3><p>No Aprobados</p></div></div>
         <div class="col-md-4"><div class="card p-3 bg-info text-white"><h3>${promAsist}%</h3><p>Asistencia Promedio</p></div></div>
     </div>`;
 }
