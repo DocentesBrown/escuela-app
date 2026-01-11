@@ -6,37 +6,85 @@ let fechaAsistenciaSeleccionada = new Date().toISOString().split('T')[0];
 let cursoActualDocente = null;
 
 async function iniciarModuloDocente() {
+    console.log('=== INICIANDO MÓDULO DOCENTE ===');
+    console.log('Usuario actual:', usuarioActual);
+    console.log('DNI del docente:', usuarioActual.dni);
+    
     document.getElementById('contenido-dinamico').innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Cargando cursos asignados...</p></div>`;
     
     try {
-        const resp = await fetch(`${URL_API}?op=getCursosDocente&rol=Docente&dni=${usuarioActual.dni || ''}`);
+        const url = `${URL_API}?op=getCursosDocente&rol=Docente&dni=${usuarioActual.dni || ''}`;
+        console.log('URL de solicitud:', url);
+        
+        const resp = await fetch(url);
         const json = await resp.json();
         
-        if (json.status !== 'success' || !json.data) {
-            document.getElementById('contenido-dinamico').innerHTML = `<div class="alert alert-warning"><h5>No tienes cursos asignados</h5><p>Contacta al directivo.</p></div>`;
+        console.log('Respuesta completa:', json);
+        
+        if (json.status !== 'success') {
+            console.log('Error en la respuesta:', json.message);
+            document.getElementById('contenido-dinamico').innerHTML = `
+                <div class="alert alert-warning">
+                    <h5>No tienes cursos asignados</h5>
+                    <p>${json.message || 'Contacta al directivo para que te asigne cursos.'}</p>
+                    <p class="small text-muted">Tu DNI: ${usuarioActual.dni}</p>
+                </div>`;
             return;
         }
         
-        let html = `<h4 class="mb-3">🏫 Mis Cursos</h4><div class="row" id="lista-cursos">`;
-        
-        if (json.data.length === 0) {
-            html += `<div class="col-12"><div class="alert alert-info">No tienes cursos asignados. Contacta al directivo.</div></div>`;
-        } else {
-            json.data.forEach(cursoData => {
-                html += `
-                <div class="col-md-6 col-lg-4 mb-3">
-                    <div class="card h-100 shadow-sm border-0 border-start border-4 border-primary">
-                        <div class="card-body">
-                            <h5 class="card-title fw-bold text-primary">${cursoData.curso}</h5>
-                            <p class="text-muted small mb-3"><i class="bi bi-people"></i> ${cursoData.totalEstudiantes} estudiantes</p>
-                            <hr>
-                            <ul class="list-unstyled">`;
-                cursoData.materias.forEach(m => {
-                    html += `<li class="mb-2"><button class="btn btn-outline-dark w-100 text-start d-flex justify-content-between align-items-center" onclick="abrirCursoDocente('${cursoData.curso}', '${m.id}', '${m.nombre}')"><span>📚 ${m.nombre}</span> <span class="badge bg-light text-dark border">${m.tipoAsignacion}</span></button></li>`;
-                });
-                html += `</ul></div></div></div>`;
-            });
+        if (!json.data || json.data.length === 0) {
+            console.log('No hay datos de cursos');
+            document.getElementById('contenido-dinamico').innerHTML = `
+                <div class="alert alert-info">
+                    <h5>No tienes cursos asignados</h5>
+                    <p>El directivo aún no te ha asignado cursos. Contacta con la administración.</p>
+                    <p class="small text-muted">Total de cursos recibidos: 0</p>
+                </div>`;
+            return;
         }
+        
+        console.log('Cursos recibidos:', json.data);
+        console.log('Total de cursos:', json.data.length);
+        
+        let html = `
+            <h4 class="mb-3">🏫 Mis Cursos (${json.data.length})</h4>
+            <div class="row" id="lista-cursos">`;
+        
+        json.data.forEach((cursoData, index) => {
+            console.log(`Curso ${index + 1}:`, cursoData);
+            
+            html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card h-100 shadow-sm border-0 border-start border-4 border-primary">
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold text-primary">${cursoData.curso || 'Sin nombre'}</h5>
+                        <p class="text-muted small mb-3">
+                            <i class="bi bi-people"></i> ${cursoData.totalEstudiantes || 0} estudiantes
+                            <br>
+                            <i class="bi bi-book"></i> ${cursoData.materias ? cursoData.materias.length : 0} materias
+                        </p>
+                        <hr>`;
+            
+            if (cursoData.materias && cursoData.materias.length > 0) {
+                html += `<ul class="list-unstyled">`;
+                cursoData.materias.forEach((m, matIndex) => {
+                    console.log(`  Materia ${matIndex + 1}:`, m);
+                    html += `
+                    <li class="mb-2">
+                        <button class="btn btn-outline-dark w-100 text-start d-flex justify-content-between align-items-center" 
+                                onclick="abrirCursoDocente('${cursoData.curso}', '${m.id}', '${m.nombre}')">
+                            <span>📚 ${m.nombre || 'Sin nombre'}</span>
+                            <span class="badge bg-light text-dark border">${m.tipoAsignacion || 'Sin tipo'}</span>
+                        </button>
+                    </li>`;
+                });
+                html += `</ul>`;
+            } else {
+                html += `<p class="text-muted small">No hay materias asignadas en este curso.</p>`;
+            }
+            
+            html += `</div></div></div>`;
+        });
         
         html += `</div>`;
         
@@ -44,7 +92,13 @@ async function iniciarModuloDocente() {
         
     } catch (e) { 
         console.error('Error en iniciarModuloDocente:', e);
-        document.getElementById('contenido-dinamico').innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`; 
+        document.getElementById('contenido-dinamico').innerHTML = `
+            <div class="alert alert-danger">
+                <h5>Error al cargar cursos</h5>
+                <p>${e.message}</p>
+                <p class="small text-muted">Verifica la consola para más detalles.</p>
+                <button class="btn btn-secondary btn-sm mt-2" onclick="location.reload()">Reintentar</button>
+            </div>`; 
     }
 }
 
