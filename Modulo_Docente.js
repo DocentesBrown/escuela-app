@@ -47,40 +47,71 @@ async function iniciarModuloDocente() {
         console.log('Total de cursos:', json.data.length);
         
         let html = `
-            <h4 class="mb-3">🏫 Mis Cursos (${json.data.length})</h4>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0">🏫 Mis Cursos</h4>
+                <span class="badge bg-primary">${json.data.length} curso(s)</span>
+            </div>
             <div class="row" id="lista-cursos">`;
         
         json.data.forEach((cursoData, index) => {
             console.log(`Curso ${index + 1}:`, cursoData);
             
+            const totalEstudiantes = cursoData.totalEstudiantes || 0;
+            const totalMaterias = cursoData.materias ? cursoData.materias.length : 0;
+            
+            // Determinar color según cantidad de estudiantes
+            let badgeColor = 'bg-secondary';
+            if (totalEstudiantes > 20) badgeColor = 'bg-success';
+            else if (totalEstudiantes > 10) badgeColor = 'bg-primary';
+            else if (totalEstudiantes > 0) badgeColor = 'bg-info';
+            
             html += `
             <div class="col-md-6 col-lg-4 mb-3">
                 <div class="card h-100 shadow-sm border-0 border-start border-4 border-primary">
                     <div class="card-body">
-                        <h5 class="card-title fw-bold text-primary">${cursoData.curso || 'Sin nombre'}</h5>
-                        <p class="text-muted small mb-3">
-                            <i class="bi bi-people"></i> ${cursoData.totalEstudiantes || 0} estudiantes
-                            <br>
-                            <i class="bi bi-book"></i> ${cursoData.materias ? cursoData.materias.length : 0} materias
-                        </p>
-                        <hr>`;
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title fw-bold text-primary mb-0">${cursoData.curso || 'Sin nombre'}</h5>
+                            <span class="badge ${badgeColor}">${totalEstudiantes} est.</span>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="text-muted small">
+                                <i class="bi bi-book"></i> ${totalMaterias} materia(s)
+                            </span>
+                            <span class="text-muted small">
+                                <i class="bi bi-person"></i> ${totalEstudiantes} inscrito(s)
+                            </span>
+                        </div>
+                        
+                        <hr class="my-2">`;
             
             if (cursoData.materias && cursoData.materias.length > 0) {
-                html += `<ul class="list-unstyled">`;
+                html += `<ul class="list-unstyled mb-0">`;
                 cursoData.materias.forEach((m, matIndex) => {
-                    console.log(`  Materia ${matIndex + 1}:`, m);
+                    // Determinar color del badge según tipo de asignación
+                    let tipoBadge = 'bg-light text-dark border';
+                    if (m.tipoAsignacion === 'Titular') tipoBadge = 'bg-success text-white';
+                    else if (m.tipoAsignacion === 'Suplencia') tipoBadge = 'bg-warning text-dark';
+                    else if (m.tipoAsignacion === 'Provisional') tipoBadge = 'bg-info text-white';
+                    else if (m.tipoAsignacion === 'Interino') tipoBadge = 'bg-secondary text-white';
+                    
                     html += `
                     <li class="mb-2">
-                        <button class="btn btn-outline-dark w-100 text-start d-flex justify-content-between align-items-center" 
-                                onclick="abrirCursoDocente('${cursoData.curso}', '${m.id}', '${m.nombre}')">
-                            <span>📚 ${m.nombre || 'Sin nombre'}</span>
-                            <span class="badge bg-light text-dark border">${m.tipoAsignacion || 'Sin tipo'}</span>
+                        <button class="btn btn-outline-dark w-100 text-start d-flex justify-content-between align-items-center p-2" 
+                                onclick="abrirCursoDocente('${cursoData.curso}', '${m.id}', '${m.nombre}')"
+                                title="Abrir ${m.nombre}">
+                            <div class="text-truncate me-2">
+                                <span class="fw-medium">${m.nombre || 'Sin nombre'}</span>
+                            </div>
+                            <div>
+                                <span class="badge ${tipoBadge}">${m.tipoAsignacion || 'Sin tipo'}</span>
+                            </div>
                         </button>
                     </li>`;
                 });
                 html += `</ul>`;
             } else {
-                html += `<p class="text-muted small">No hay materias asignadas en este curso.</p>`;
+                html += `<p class="text-muted small mb-0">No hay materias asignadas en este curso.</p>`;
             }
             
             html += `</div></div></div>`;
@@ -101,7 +132,6 @@ async function iniciarModuloDocente() {
             </div>`; 
     }
 }
-
 async function abrirCursoDocente(curso, idMateria, nombreMateria) {
     document.getElementById('contenido-dinamico').innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Cargando datos...</p></div>`;
     
