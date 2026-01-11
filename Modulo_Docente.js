@@ -485,14 +485,32 @@ function calcularEstado(dni) {
     const aprobadoC1 = (vN1 >= 7) || (vI1 >= 4);
     const aprobadoC2 = (vN2 >= 7) || (vI2 >= 4);
     
-    // Calcular nota efectiva de cada cuatrimestre
+    // Calcular la NOTA EFECTIVA para cada cuatrimestre (la que se usará para el promedio)
+    // Si hay intensificación aprobada (≥4), se usa esa. Si no, se usa la nota regular si está aprobada (≥7)
     let notaEfectivaC1 = 0;
-    if (vN1 > 0) notaEfectivaC1 = vN1;
-    if (vI1 > 0 && vI1 > vN1) notaEfectivaC1 = vI1;
-    
     let notaEfectivaC2 = 0;
-    if (vN2 > 0) notaEfectivaC2 = vN2;
-    if (vI2 > 0 && vI2 > vN2) notaEfectivaC2 = vI2;
+    
+    // Cuatrimestre 1
+    if (vI1 >= 4) {
+        notaEfectivaC1 = vI1; // Intensificación aprobada
+    } else if (vN1 >= 7) {
+        notaEfectivaC1 = vN1; // Nota regular aprobada
+    } else if (vN1 > 0) {
+        notaEfectivaC1 = vN1; // Nota regular desaprobada (se muestra igual para el promedio)
+    } else if (vI1 > 0) {
+        notaEfectivaC1 = vI1; // Intensificación desaprobada (se muestra igual para el promedio)
+    }
+    
+    // Cuatrimestre 2
+    if (vI2 >= 4) {
+        notaEfectivaC2 = vI2; // Intensificación aprobada
+    } else if (vN2 >= 7) {
+        notaEfectivaC2 = vN2; // Nota regular aprobada
+    } else if (vN2 > 0) {
+        notaEfectivaC2 = vN2; // Nota regular desaprobada (se muestra igual para el promedio)
+    } else if (vI2 > 0) {
+        notaEfectivaC2 = vI2; // Intensificación desaprobada (se muestra igual para el promedio)
+    }
     
     // CALCULAR PROMEDIO - SIEMPRE QUE HAYA AL MENOS UNA NOTA EN AMBOS CUATRIMESTRES
     let promedio = 0;
@@ -503,9 +521,9 @@ function calcularEstado(dni) {
     const tieneNotaC2 = (vN2 > 0) || (vI2 > 0);
     
     if (tieneNotaC1 && tieneNotaC2) {
-        // Si hay intensificación usamos la nota efectiva, sino la nota regular
-        const notaFinalC1 = notaEfectivaC1 > 0 ? notaEfectivaC1 : vN1;
-        const notaFinalC2 = notaEfectivaC2 > 0 ? notaEfectivaC2 : vN2;
+        // Si hay notas efectivas calculadas, usarlas
+        const notaFinalC1 = notaEfectivaC1 > 0 ? notaEfectivaC1 : (vN1 > 0 ? vN1 : vI1);
+        const notaFinalC2 = notaEfectivaC2 > 0 ? notaEfectivaC2 : (vN2 > 0 ? vN2 : vI2);
         
         promedio = Math.round((notaFinalC1 + notaFinalC2) / 2);
         if (promedio > 10) promedio = 10;
@@ -588,7 +606,7 @@ function calcularEstado(dni) {
         }
     }
     
-    console.log(`Resultado: ${definitiva} - ${estado}`);
+    console.log(`Resultado: Notas efectivas C1=${notaEfectivaC1}, C2=${notaEfectivaC2}, Prom=${promedio}, Def=${definitiva}, Estado=${estado}`);
     
     return {
         dni: dni,
@@ -603,7 +621,6 @@ function calcularEstado(dni) {
         estado: estado
     };
 }
-
 
 function getColorEstado(estado) {
     const colores = {
