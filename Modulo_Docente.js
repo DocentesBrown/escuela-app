@@ -1,5 +1,5 @@
 // ============================================================================
-// ARCHIVO: Modulo_Docente.js
+// ARCHIVO: Modulo_Docente.js (ACTUALIZADO)
 // ============================================================================
 
 async function iniciarModuloDocente() {
@@ -30,6 +30,10 @@ async function iniciarModuloDocente() {
             html += `</ul></div></div></div>`;
         });
         html += `</div>`;
+        
+        // AGREGAMOS EL MODAL DE JUSTIFICACION AL FINAL
+        html += renderModalJustificarDocenteHTML();
+
         document.getElementById('contenido-dinamico').innerHTML = html;
         
     } catch (e) { document.getElementById('contenido-dinamico').innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`; }
@@ -79,7 +83,7 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
 
                     <div id="tabNotas" class="d-none">
                         <div class="alert alert-info small mb-2">
-                            <i class="bi bi-info-circle"></i> <b>Reglas:</b> Intensificación se habilita si nota < 7. Final >= 7 aprueba. Final < 7 habilita Diciembre.
+                            <i class="bi bi-info-circle"></i> <b>Reglas:</b> Intensificación se habilita si nota < 7. Final >= 7 aprueba. Final < 7 habilita Diciembre (Ej: 6.50 va a Diciembre).
                         </div>
                         ${renderTablaNotasDocente(json.data.estudiantes)}
                     </div>
@@ -87,7 +91,11 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
             </div>`;
         document.getElementById('contenido-dinamico').innerHTML = html;
         
-        // Ejecutamos cálculo inicial para bloquear campos según datos cargados
+        // INYECTAMOS DE NUEVO EL MODAL POR SI SE PERDIÓ AL REESCRIBIR EL HTML
+        if(!document.getElementById('modalJustificarDocente')) {
+             document.getElementById('contenido-dinamico').insertAdjacentHTML('beforeend', renderModalJustificarDocenteHTML());
+        }
+        
         setTimeout(recalcularTodoAlInicio, 500);
 
     } catch (e) { 
@@ -101,10 +109,8 @@ function mostrarTabDocente(tab, btn) {
     document.getElementById('tabAsistencia').classList.add('d-none');
     document.getElementById('tabNotas').classList.add('d-none');
     
-    // Quitar active de todos los botones
     document.querySelectorAll('#tabsDocente .nav-link').forEach(b => b.classList.remove('active'));
     
-    // Activar el seleccionado
     const target = tab === 'asistencia' ? 'tabAsistencia' : 'tabNotas';
     document.getElementById(target).classList.remove('d-none');
     btn.classList.add('active');
@@ -114,9 +120,7 @@ function mostrarTabDocente(tab, btn) {
 
 function cambiarFechaAsistencia(nuevaFecha) {
     fechaAsistenciaSeleccionada = nuevaFecha;
-    alert(`📅 Fecha cambiada al ${nuevaFecha}. \n\nRecuerda: Al guardar, estarás modificando la asistencia de ESTE día.`);
-    // Opcional: Aquí podríamos hacer un fetch para traer la asistencia de ese día si ya fue cargada, 
-    // pero para simplificar, el docente sobreescribe.
+    alert(`📅 Fecha cambiada al ${nuevaFecha}.`);
 }
 
 function renderTablaAsistenciaDocente(est) {
@@ -124,8 +128,9 @@ function renderTablaAsistenciaDocente(est) {
     <thead class="table-dark text-center">
         <tr>
             <th class="text-start ps-3">Estudiante</th>
-            <th style="width: 100px;" class="bg-success">Presente</th>
-            <th style="width: 100px;" class="bg-danger">Ausente</th>
+            <th style="width: 80px;" class="bg-success">P</th>
+            <th style="width: 80px;" class="bg-danger">A</th>
+            <th style="width: 60px;">Edit</th>
         </tr>
     </thead>
     <tbody>`;
@@ -138,6 +143,9 @@ function renderTablaAsistenciaDocente(est) {
         </td>
         <td class="text-center bg-danger bg-opacity-10">
             <input type="radio" name="asis_${e.dni}" value="A" class="form-check-input" style="transform: scale(1.3); cursor:pointer;">
+        </td>
+        <td class="text-center">
+             <button class="btn btn-sm btn-outline-secondary" onclick="abrirModalJustificarDoc('${e.dni}', '${e.nombre}')" title="Ver/Justificar faltas">✏️</button>
         </td>
         </tr>`;
     });
@@ -160,7 +168,7 @@ async function guardarAsistenciaDocente() {
                 op: 'guardarAsistenciaDocente', 
                 dniDocente: usuarioActual.dni, 
                 idMateria: window.cursoActualDocente.idMateria, 
-                fecha: fechaAsistenciaSeleccionada, // Usamos la fecha del calendario
+                fecha: fechaAsistenciaSeleccionada, 
                 asistencia: lista 
             }) 
         });
@@ -168,6 +176,70 @@ async function guardarAsistenciaDocente() {
     } catch (e) { alert('Error al guardar asistencia.'); } 
     finally { btn.disabled = false; btn.innerText = "💾 Guardar Asistencia"; }
 }
+
+// --- NUEVAS FUNCIONES: JUSTIFICACIÓN ---
+
+function renderModalJustificarDocenteHTML() {
+    return `
+    <div class="modal fade" id="modalJustificarDocente" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-warning">
+            <h5 class="modal-title text-dark">Justificar Inasistencias</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p>Alumno: <b id="just_doc_nombre"></b></p>
+            <div id="lista_faltas_docente" class="list-group">
+                <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Cargando...</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function abrirModalJustificarDoc(dni, nombre) {
+    if (!window.cursoActualDocente) return;
+    const modal = new bootstrap.Modal(document.getElementById('modalJustificarDocente'));
+    document.getElementById('just_doc_nombre').innerText = nombre;
+    document.getElementById('lista_faltas_docente').innerHTML = '<div class="text-center p-3"><div class="spinner-border text-warning"></div> Buscando faltas...</div>';
+    modal.show();
+
+    try {
+        const resp = await fetch(`${URL_API}?op=getFaltasAlumnoDocente&dni=${dni}&idMateria=${window.cursoActualDocente.idMateria}`);
+        const json = await resp.json();
+        
+        const divLista = document.getElementById('lista_faltas_docente');
+        divLista.innerHTML = '';
+
+        if (json.data && json.data.length > 0) {
+            json.data.forEach(falta => {
+                divLista.innerHTML += `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>📅 ${falta.fecha} - <span class="badge bg-danger">Ausente</span></span>
+                    <button class="btn btn-sm btn-outline-success" onclick="justificarFaltaAccion(${falta.fila}, '${dni}', '${nombre}')">Justificar ✅</button>
+                </div>`;
+            });
+        } else {
+            divLista.innerHTML = '<div class="alert alert-success m-2">No tiene inasistencias injustificadas para esta materia.</div>';
+        }
+    } catch (e) {
+        document.getElementById('lista_faltas_docente').innerHTML = '<div class="text-danger">Error al cargar datos.</div>';
+    }
+}
+
+async function justificarFaltaAccion(fila, dni, nombre) {
+    if(!confirm("¿Confirmar justificación?")) return;
+    try {
+        await fetch(URL_API, { method: 'POST', body: JSON.stringify({ op: 'justificarFaltaDocente', fila: fila }) });
+        abrirModalJustificarDoc(dni, nombre); // Recargar lista
+    } catch (e) { alert("Error al justificar."); }
+}
+
 
 // --- LÓGICA DE NOTAS (LA CALCULADORA) ---
 
@@ -194,21 +266,15 @@ function renderTablaNotasDocente(est) {
             
     est.forEach(e => {
         const n = e.notas || {};
-        // Renderizamos inputs con Data Attributes para encontrarlos fácil
         html += `<tr data-dni="${e.dni}">
             <td class="fw-bold ps-2">${e.nombre}</td>
-            
             <td class="p-1"><input type="number" min="1" max="10" class="form-control text-center nota-input n1" value="${n.n1_c1||''}" oninput="calcularFila('${e.dni}')"></td>
             <td class="p-1"><input type="number" min="1" max="10" class="form-control text-center nota-input i1" value="${n.i1||''}" disabled oninput="calcularFila('${e.dni}')"></td>
-            
             <td class="p-1"><input type="number" min="1" max="10" class="form-control text-center nota-input n2" value="${n.n1_c2||''}" oninput="calcularFila('${e.dni}')"></td>
             <td class="p-1"><input type="number" min="1" max="10" class="form-control text-center nota-input i2" value="${n.i2||''}" disabled oninput="calcularFila('${e.dni}')"></td>
-            
             <td class="text-center fw-bold bg-light"><span class="promedio">-</span></td>
-            
             <td class="p-1"><input type="number" min="1" max="10" class="form-control text-center nota-input dic" value="${n.dic||''}" disabled oninput="calcularFila('${e.dni}')"></td>
             <td class="p-1"><input type="number" min="1" max="10" class="form-control text-center nota-input feb" value="${n.feb||''}" disabled oninput="calcularFila('${e.dni}')"></td>
-            
             <td class="text-center fw-bold text-white bg-secondary def-cell"><span class="definitiva">-</span></td>
         </tr>`;
     });
@@ -217,22 +283,18 @@ function renderTablaNotasDocente(est) {
     <div class="d-grid gap-2 mt-3">
         <button class="btn btn-primary" onclick="guardarNotasDocente()">💾 Guardar Todas las Notas</button>
     </div>`;
-    
     return html;
 }
 
-// Función que se ejecuta al cargar para aplicar reglas a datos existentes
 function recalcularTodoAlInicio() {
     if(!window.cursoActualDocente) return;
     window.cursoActualDocente.estudiantes.forEach(e => calcularFila(e.dni));
 }
 
-// EL CEREBRO DE LAS NOTAS
 function calcularFila(dni) {
     const row = document.querySelector(`tr[data-dni="${dni}"]`);
     if(!row) return;
 
-    // Obtener Inputs
     const inN1 = row.querySelector('.n1');
     const inI1 = row.querySelector('.i1');
     const inN2 = row.querySelector('.n2');
@@ -244,96 +306,64 @@ function calcularFila(dni) {
     const spanDef = row.querySelector('.definitiva');
     const tdDef = row.querySelector('.def-cell');
 
-    // Valores Numéricos (0 si vacío)
     let vN1 = parseFloat(inN1.value) || 0;
     let vN2 = parseFloat(inN2.value) || 0;
     
-    // 1. REGLA INTENSIFICACION: Si cuatri < 7, se habilita intensificación
+    // Intensificación si < 7
     if (vN1 > 0 && vN1 < 7) inI1.disabled = false; else { inI1.disabled = true; inI1.value = ''; }
     if (vN2 > 0 && vN2 < 7) inI2.disabled = false; else { inI2.disabled = true; inI2.value = ''; }
 
-    // Obtenemos valor de intensificaciones (si están habilitadas)
     let vI1 = !inI1.disabled ? (parseFloat(inI1.value) || 0) : 0;
     let vI2 = !inI2.disabled ? (parseFloat(inI2.value) || 0) : 0;
 
-    // 2. CALCULO DE PROMEDIO 
-    // Si aprobó intensificación (>=4), consideramos el cuatri "salvado" con 4 para el promedio? 
-    // O usamos la nota original? El sistema PBA suele ser complejo. 
-    // REGLA SIMPLIFICADA PEDIDA: "Promedio de los cuatris". 
-    // Si recuperó, usaremos la nota de recuperación (tope 7 o 4 según criterio, usaremos valor real input).
-    
-    let notaFinal1 = vI1 >= 4 ? vI1 : vN1; // Si recuperó, toma nota recup, sino nota original
-    let notaFinal2 = vI2 >= 4 ? vI2 : vN2;
+    // Si recuperó (nota >= 4), usamos esa. Si no, la original.
+    let final1 = vI1 >= 4 ? vI1 : vN1;
+    let final2 = vI2 >= 4 ? vI2 : vN2;
 
     let promedio = 0;
-    if (vN1 > 0 && vN2 > 0) {
-        promedio = (notaFinal1 + notaFinal2) / 2;
-        spanProm.innerText = promedio.toFixed(1); // Redondeo simple
-        // Redondeo matemático para definir aprobación (6.5 -> 7)
-        promedio = Math.round(promedio); 
-    } else {
-        spanProm.innerText = "-";
-    }
-
-    // 3. LOGICA DICIEMBRE / FEBRERO / DEFINITIVA
-    
     let definitiva = "-";
-    let estado = "cursando"; // cursando, aprobado, diciembre, febrero, ci
 
-    // Solo calculamos si hay notas cargadas
     if (vN1 > 0 && vN2 > 0) {
+        let calculo = (final1 + final2) / 2;
+        
+        // CORRECCIÓN PARA 6.50: No redondeamos todavía para la decisión
+        promedio = parseFloat(calculo.toFixed(2)); 
+        spanProm.innerText = promedio; // Mostramos ej: 6.50
+
+        // Si es >= 7 PROMOCIONA. Si es 6.99 o menos, DICIEMBRE.
         if (promedio >= 7) {
-            // PROMOCIONA
-            definitiva = promedio;
-            estado = "aprobado";
+            definitiva = Math.round(promedio); // Redondeo final para nota de acta
+            if(definitiva < 7) definitiva = 7; 
             inDic.disabled = true; inDic.value = '';
             inFeb.disabled = true; inFeb.value = '';
         } else {
             // A DICIEMBRE
-            estado = "diciembre";
             inDic.disabled = false;
-            
             let vDic = parseFloat(inDic.value) || 0;
             
-            if (vDic >= 4) {
-                // APROBÓ DICIEMBRE
-                definitiva = vDic;
-                estado = "aprobado_dic";
+            if (inDic.value !== "" && vDic >= 4) {
+                definitiva = vDic; 
                 inFeb.disabled = true; inFeb.value = '';
-            } else {
-                // A FEBRERO (Si ya pasamos diciembre y no aprobó o no rindió)
-                // Habilitamos febrero si hay algo escrito en diciembre (aunque sea un 1) o si explicitamente queremos habilitarlo
-                // Asumimos que si promedio < 7, Diciembre está abierto. Si diciembre < 4 (y tiene dato), abre Febrero.
-                
-                if (inDic.value !== "") { // Solo si ya "rindió" mal diciembre
-                    estado = "febrero";
-                    inFeb.disabled = false;
-                    
-                    let vFeb = parseFloat(inFeb.value) || 0;
-                    if (inFeb.value !== "") {
-                         if (vFeb >= 4) {
-                             definitiva = vFeb;
-                             estado = "aprobado_feb";
-                         } else {
-                             definitiva = "C.I.";
-                             estado = "recursante";
-                         }
-                    } else {
-                        definitiva = "-"; // Esperando nota febrero
-                    }
-                } else {
-                    definitiva = "-"; // Esperando nota diciembre
-                    inFeb.disabled = true;
+            } else if (inDic.value !== "" && vDic < 4) {
+                // A FEBRERO
+                inFeb.disabled = false;
+                let vFeb = parseFloat(inFeb.value) || 0;
+                if (inFeb.value !== "") {
+                     definitiva = vFeb >= 4 ? vFeb : "C.I.";
                 }
+            } else {
+                inFeb.disabled = true; 
             }
         }
+    } else {
+        spanProm.innerText = "-";
+        inDic.disabled = true; 
+        inFeb.disabled = true;
     }
 
-    // ACTUALIZAR VISTA DEFINITIVA
     spanDef.innerText = definitiva;
     
-    // Colores Definitiva
-    tdDef.className = "text-center fw-bold text-white def-cell"; // Reset
+    tdDef.className = "text-center fw-bold text-white def-cell";
     if (definitiva === "C.I.") tdDef.classList.add("bg-danger");
     else if (definitiva !== "-") tdDef.classList.add("bg-success");
     else tdDef.classList.add("bg-secondary");
