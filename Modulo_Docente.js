@@ -530,8 +530,12 @@ function renderTablaNotasDocente(est) {
 }
 
 function calcularFilaCompleta(dni) {
+    console.log(`=== CALCULAR FILA PARA DNI: ${dni} ===`);
     const row = document.querySelector(`tr[data-dni="${dni}"]`);
-    if (!row) return;
+    if (!row) {
+        console.log('Error: No se encontró la fila para DNI:', dni);
+        return;
+    }
 
     // Obtener elementos
     const inN1 = row.querySelector('.n1');
@@ -553,64 +557,87 @@ function calcularFilaCompleta(dni) {
     const vDic = parseFloat(inDic.value) || 0;
     const vFeb = parseFloat(inFeb.value) || 0;
 
-    // LÓGICA DE INTENSIFICACIÓN
-    // Si la nota del cuatrimestre es < 7, habilitar intensificación
+    console.log('Valores iniciales:', { vN1, vI1, vN2, vI2, vDic, vFeb });
+
+    // --- LÓGICA DE INTENSIFICACIÓN ---
+    // Si la nota del cuatrimestre es < 7 y > 0, habilitar intensificación
     if (inN1.value !== "") {
         if (vN1 < 7 && vN1 > 0) {
+            console.log('Habilitando intensificación 1 porque vN1 =', vN1);
             inI1.disabled = false;
             inI1.placeholder = "Ingrese intensif.";
         } else {
+            console.log('Deshabilitando intensificación 1 porque vN1 =', vN1);
             inI1.disabled = true;
             inI1.value = '';
             vI1 = 0;
         }
+    } else {
+        // Si no hay nota en N1, deshabilitar intensificación 1
+        inI1.disabled = true;
+        inI1.value = '';
+        vI1 = 0;
     }
 
     if (inN2.value !== "") {
         if (vN2 < 7 && vN2 > 0) {
+            console.log('Habilitando intensificación 2 porque vN2 =', vN2);
             inI2.disabled = false;
             inI2.placeholder = "Ingrese intensif.";
         } else {
+            console.log('Deshabilitando intensificación 2 porque vN2 =', vN2);
             inI2.disabled = true;
             inI2.value = '';
             vI2 = 0;
         }
+    } else {
+        // Si no hay nota en N2, deshabilitar intensificación 2
+        inI2.disabled = true;
+        inI2.value = '';
+        vI2 = 0;
     }
 
     // Determinar si los cuatrimestres están aprobados
     const aprobadoC1 = (vN1 >= 7) || (vI1 >= 4);
     const aprobadoC2 = (vN2 >= 7) || (vI2 >= 4);
     
+    console.log('Aprobado C1?', aprobadoC1, '(N1:', vN1, 'I1:', vI1, ')');
+    console.log('Aprobado C2?', aprobadoC2, '(N2:', vN2, 'I2:', vI2, ')');
+    
     // Calcular nota efectiva de cada cuatrimestre
     let notaEfectivaC1 = 0;
     let notaEfectivaC2 = 0;
     
-    if (aprobadoC1) {
-        notaEfectivaC1 = Math.max(vN1, vI1);
-    } else {
-        notaEfectivaC1 = Math.max(vN1, vI1);
+    if (vN1 > 0 || vI1 > 0) {
+        // Usar la intensificación si existe, de lo contrario usar la nota normal
+        notaEfectivaC1 = vI1 > 0 ? vI1 : vN1;
     }
     
-    if (aprobadoC2) {
-        notaEfectivaC2 = Math.max(vN2, vI2);
-    } else {
-        notaEfectivaC2 = Math.max(vN2, vI2);
+    if (vN2 > 0 || vI2 > 0) {
+        notaEfectivaC2 = vI2 > 0 ? vI2 : vN2;
     }
 
-    // Calcular promedio
+    // Calcular promedio SOLO si hay notas en ambos cuatrimestres
     let promedio = 0;
-    if (inN1.value !== "" && inN2.value !== "") {
+    if ((vN1 > 0 || vI1 > 0) && (vN2 > 0 || vI2 > 0)) {
         promedio = (notaEfectivaC1 + notaEfectivaC2) / 2;
         promedio = Math.round(promedio * 10) / 10; // Redondear a 1 decimal
     }
+    
+    console.log('Notas efectivas:', { notaEfectivaC1, notaEfectivaC2 });
+    console.log('Promedio calculado:', promedio);
 
-    // LÓGICA DE DEFINITIVA
+    // --- LÓGICA DE DEFINITIVA ---
     let definitiva = "-";
     let estado = "Sin datos";
     
-    if (inN1.value !== "" && inN2.value !== "") {
+    // Solo procesar si hay notas en ambos cuatrimestres
+    if ((vN1 > 0 || vI1 > 0) && (vN2 > 0 || vI2 > 0)) {
+        console.log('Procesando definitiva con ambas notas...');
+        
         // CASO 1: Ambos cuatrimestres aprobados y Promedio ≥ 7
         if (aprobadoC1 && aprobadoC2 && promedio >= 7) {
+            console.log('CASO 1: Promoción directa');
             definitiva = Math.round(promedio);
             if (definitiva < 7) definitiva = 7;
             inDic.disabled = true;
@@ -619,21 +646,26 @@ function calcularFilaCompleta(dni) {
             inFeb.value = '';
             estado = "Aprobado por promoción";
         } 
-        // CASO 2: Va a Diciembre
+        // CASO 2: Va a Diciembre (algo no está aprobado o promedio < 7)
         else {
+            console.log('CASO 2: Va a Diciembre');
             inDic.disabled = false;
             
-            if (inDic.value !== "") {
+            if (inDic.value !== "" && vDic > 0) {
+                console.log('Tiene nota en Diciembre:', vDic);
                 // Si tiene nota de Diciembre
                 if (vDic >= 4) {
+                    console.log('Aprobó en Diciembre');
                     definitiva = vDic;
                     inFeb.disabled = true;
                     inFeb.value = '';
                     estado = "Aprobado en Diciembre";
                 } else {
+                    console.log('No aprobó en Diciembre, habilita Febrero');
                     // Va a Febrero
                     inFeb.disabled = false;
-                    if (inFeb.value !== "") {
+                    if (inFeb.value !== "" && vFeb > 0) {
+                        console.log('Tiene nota en Febrero:', vFeb);
                         if (vFeb >= 4) {
                             definitiva = vFeb;
                             estado = "Aprobado en Febrero";
@@ -646,22 +678,40 @@ function calcularFilaCompleta(dni) {
                     }
                 }
             } else {
+                console.log('No tiene nota en Diciembre, estado Regular');
                 inFeb.disabled = true;
                 estado = "Regular";
             }
         }
     } else {
+        console.log('Faltan notas en uno o ambos cuatrimestres');
         inDic.disabled = true;
         inFeb.disabled = true;
-        estado = "Faltan notas";
+        if (vN1 > 0 || vI1 > 0 || vN2 > 0 || vI2 > 0) {
+            estado = "Faltan notas";
+        } else {
+            estado = "Sin calificar";
+        }
     }
 
     // Actualizar interfaz
-    if (spanProm) spanProm.innerText = promedio > 0 ? promedio.toFixed(1) : "-";
-    if (spanDef) spanDef.innerText = definitiva;
-    if (spanEstado) spanEstado.innerText = estado;
+    if (spanProm) {
+        if (promedio > 0) {
+            spanProm.innerText = promedio.toFixed(1);
+            spanProm.className = 'fw-bold ' + (promedio >= 7 ? 'text-success' : 'text-danger');
+        } else {
+            spanProm.innerText = "-";
+            spanProm.className = 'fw-bold';
+        }
+    }
     
-    // Colores según estado
+    if (spanDef) spanDef.innerText = definitiva;
+    if (spanEstado) {
+        spanEstado.innerText = estado;
+        spanEstado.className = 'estado small ' + getEstadoColor(estado);
+    }
+    
+    // Colores según estado definitiva
     if (tdDef) {
         if (definitiva === "C.I.") {
             tdDef.className = "text-center fw-bold text-white def-cell bg-danger";
@@ -673,6 +723,9 @@ function calcularFilaCompleta(dni) {
             tdDef.className = "text-center fw-bold text-white def-cell bg-secondary";
         }
     }
+    
+    console.log('Resultado final:', { definitiva, estado, promedio });
+    console.log('--- FIN CÁLCULO ---\n');
     
     return {
         dni: dni,
@@ -688,6 +741,182 @@ function calcularFilaCompleta(dni) {
         aprobadoC1: aprobadoC1,
         aprobadoC2: aprobadoC2
     };
+}
+
+function getEstadoColor(estado) {
+    switch(estado) {
+        case 'Aprobado por promoción': return 'text-success fw-bold';
+        case 'Aprobado en Diciembre': return 'text-primary';
+        case 'Aprobado en Febrero': return 'text-info';
+        case 'Recursa (C.I.)': return 'text-danger fw-bold';
+        case 'En Diciembre': return 'text-warning';
+        case 'Regular': return 'text-secondary';
+        case 'Sin calificar': return 'text-muted';
+        case 'Faltan notas': return 'text-warning';
+        default: return 'text-muted';
+    }
+}
+
+// Función para inicializar todas las filas al cargar
+function inicializarNotasAlCargar() {
+    if (!window.cursoActualDocente || !window.cursoActualDocente.estudiantes) {
+        console.log('No hay datos del curso para inicializar notas');
+        return;
+    }
+    
+    console.log('=== INICIALIZANDO NOTAS AL CARGAR ===');
+    console.log('Total estudiantes:', window.cursoActualDocente.estudiantes.length);
+    
+    // Esperar un momento para que el DOM se renderice completamente
+    setTimeout(() => {
+        const rows = document.querySelectorAll('#tabNotas tr[data-dni]');
+        console.log('Filas encontradas en DOM:', rows.length);
+        
+        rows.forEach(row => {
+            const dni = row.dataset.dni;
+            console.log(`Inicializando fila para DNI: ${dni}`);
+            
+            // Llamar a calcular para inicializar estados
+            calcularFilaCompleta(dni);
+            
+            // Agregar eventos para cambios en tiempo real
+            const inputs = row.querySelectorAll('input[type="number"]');
+            inputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    console.log(`Cambio en ${this.className} para DNI ${dni}:`, this.value);
+                    calcularFilaCompleta(dni);
+                });
+            });
+        });
+        
+        console.log('=== INICIALIZACIÓN COMPLETADA ===\n');
+    }, 500);
+}
+
+// Modificar la función abrirCursoDocente para llamar a la inicialización
+async function abrirCursoDocente(curso, idMateria, nombreMateria) {
+    // ... (código anterior igual) ...
+    
+    // DESPUÉS de cargar el HTML, agregar:
+    document.getElementById('contenido-dinamico').innerHTML = html;
+    
+    // Inicializar notas después de que se renderice el DOM
+    setTimeout(() => {
+        if (window.cursoActualDocente && window.cursoActualDocente.estudiantes) {
+            inicializarNotasAlCargar();
+        }
+    }, 300);
+    
+    // ... (resto del código igual) ...
+}
+
+// También agregar este helper para el evento onchange
+function habilitarIntensificacion(inputElement, intensificacionElement) {
+    const valor = parseFloat(inputElement.value) || 0;
+    console.log(`Habilitar intensificación? Valor: ${valor}`);
+    
+    if (valor > 0 && valor < 7) {
+        intensificacionElement.disabled = false;
+        intensificacionElement.placeholder = "Ingrese intensif.";
+        console.log('Intensificación HABILITADA');
+    } else {
+        intensificacionElement.disabled = true;
+        intensificacionElement.value = '';
+        console.log('Intensificación DESHABILITADA');
+    }
+    
+    // Recalcular toda la fila
+    const dni = inputElement.closest('tr').dataset.dni;
+    if (dni) {
+        calcularFilaCompleta(dni);
+    }
+}
+
+// Y actualizar la función renderTablaNotasDocente para usar el nuevo helper
+function renderTablaNotasDocente(est) {
+    let html = `
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+            <thead class="table-dark text-center">
+                <tr>
+                    <th class="text-start">Estudiante</th>
+                    <th>1er C (N)</th>
+                    <th>Intens.</th>
+                    <th>2do C (N)</th>
+                    <th>Intens.</th>
+                    <th>Prom</th>
+                    <th>Dic</th>
+                    <th>Feb</th>
+                    <th>Def</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>`;
+    
+    if (est.length === 0) {
+        html += `<tr><td colspan="10" class="text-center text-muted py-4">No hay estudiantes en este curso</td></tr>`;
+    } else {
+        est.forEach(e => {
+            const notas = e.notas || {};
+            html += `
+            <tr data-dni="${e.dni}">
+                <td class="fw-bold text-start">${e.nombre}</td>
+                <td class="text-center">
+                    <input type="number" class="form-control form-control-sm n1" 
+                           value="${notas.nota1_C1 || ''}" min="0" max="10" step="0.5" 
+                           oninput="habilitarIntensificacion(this, this.parentElement.nextElementSibling.querySelector('.i1'))">
+                </td>
+                <td class="text-center">
+                    <input type="number" class="form-control form-control-sm i1" 
+                           value="${notas.intensificacion1 || ''}" min="0" max="10" step="0.5" 
+                           oninput="calcularFilaCompleta('${e.dni}')" disabled>
+                </td>
+                <td class="text-center">
+                    <input type="number" class="form-control form-control-sm n2" 
+                           value="${notas.nota1_C2 || ''}" min="0" max="10" step="0.5" 
+                           oninput="habilitarIntensificacion(this, this.parentElement.nextElementSibling.querySelector('.i2'))">
+                </td>
+                <td class="text-center">
+                    <input type="number" class="form-control form-control-sm i2" 
+                           value="${notas.intensificacion2 || ''}" min="0" max="10" step="0.5" 
+                           oninput="calcularFilaCompleta('${e.dni}')" disabled>
+                </td>
+                <td class="text-center"><span class="fw-bold promedio">-</span></td>
+                <td class="text-center">
+                    <input type="number" class="form-control form-control-sm dic" 
+                           value="${notas.diciembre || ''}" min="0" max="10" step="0.5" 
+                           oninput="calcularFilaCompleta('${e.dni}')" disabled>
+                </td>
+                <td class="text-center">
+                    <input type="number" class="form-control form-control-sm feb" 
+                           value="${notas.febrero || ''}" min="0" max="10" step="0.5" 
+                           oninput="calcularFilaCompleta('${e.dni}')" disabled>
+                </td>
+                <td class="text-center fw-bold text-white def-cell bg-secondary">
+                    <span class="definitiva">-</span>
+                </td>
+                <td class="text-center">
+                    <span class="estado small">-</span>
+                </td>
+            </tr>`;
+        });
+    }
+    
+    html += `</tbody></table>
+        <div class="alert alert-warning small mb-3">
+            <b>Lógica del sistema:</b><br>
+            1. Si nota de cuatrimestre &lt; 7 → Se habilita intensificación (aprueba con 4)<br>
+            2. Si ambos cuatrimestres aprobados y Promedio ≥ 7 → Promoción directa<br>
+            3. Si no → Va a Diciembre (aprueba con 4) → Febrero → C.I.
+        </div>
+        <div class="text-end mt-3">
+            <button class="btn btn-primary" onclick="guardarNotasDocente()">
+                💾 Guardar Todas las Calificaciones
+            </button>
+        </div>
+    </div>`;
+    
+    return html;
 }
 
 async function guardarNotasDocente() {
