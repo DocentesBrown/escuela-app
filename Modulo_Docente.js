@@ -485,22 +485,38 @@ function calcularEstado(dni) {
     const aprobadoC1 = (vN1 >= 7) || (vI1 >= 4);
     const aprobadoC2 = (vN2 >= 7) || (vI2 >= 4);
     
-    // Calcular nota efectiva
-    let notaEfectivaC1 = Math.max(vN1, vI1);
-    let notaEfectivaC2 = Math.max(vN2, vI2);
+    // Calcular nota efectiva de cada cuatrimestre
+    let notaEfectivaC1 = 0;
+    if (vN1 > 0) notaEfectivaC1 = vN1;
+    if (vI1 > 0 && vI1 > vN1) notaEfectivaC1 = vI1;
     
-    // Calcular promedio
+    let notaEfectivaC2 = 0;
+    if (vN2 > 0) notaEfectivaC2 = vN2;
+    if (vI2 > 0 && vI2 > vN2) notaEfectivaC2 = vI2;
+    
+    // CALCULAR PROMEDIO - SIEMPRE QUE HAYA AL MENOS UNA NOTA EN AMBOS CUATRIMESTRES
     let promedio = 0;
-    if ((vN1 > 0 || vI1 > 0) && (vN2 > 0 || vI2 > 0)) {
-        promedio = Math.round((notaEfectivaC1 + notaEfectivaC2) / 2);
+    let mostrarPromedio = false;
+    
+    // Verificar si hay al menos una nota en cada cuatrimestre
+    const tieneNotaC1 = (vN1 > 0) || (vI1 > 0);
+    const tieneNotaC2 = (vN2 > 0) || (vI2 > 0);
+    
+    if (tieneNotaC1 && tieneNotaC2) {
+        // Si hay intensificación usamos la nota efectiva, sino la nota regular
+        const notaFinalC1 = notaEfectivaC1 > 0 ? notaEfectivaC1 : vN1;
+        const notaFinalC2 = notaEfectivaC2 > 0 ? notaEfectivaC2 : vN2;
+        
+        promedio = Math.round((notaFinalC1 + notaFinalC2) / 2);
         if (promedio > 10) promedio = 10;
+        mostrarPromedio = true;
     }
     
     // Lógica de definitiva
     let definitiva = "-";
     let estado = "Sin calificar";
     
-    if ((vN1 > 0 || vI1 > 0) && (vN2 > 0 || vI2 > 0)) {
+    if (tieneNotaC1 && tieneNotaC2) {
         // CASO 1: Promoción
         if (aprobadoC1 && aprobadoC2 && promedio >= 7) {
             definitiva = promedio;
@@ -542,9 +558,9 @@ function calcularEstado(dni) {
         estado = "Faltan notas";
     }
 
-    // Actualizar interfaz
+    // Actualizar interfaz - PROMEDIO SIEMPRE SE MUESTRA
     if (spanProm) {
-        if (promedio > 0) {
+        if (mostrarPromedio && promedio > 0) {
             spanProm.innerText = promedio;
             spanProm.className = 'fw-bold ' + (promedio >= 7 ? 'text-success' : 'text-danger');
         } else {
@@ -588,6 +604,7 @@ function calcularEstado(dni) {
     };
 }
 
+
 function getColorEstado(estado) {
     const colores = {
         'Promoción': 'text-success fw-bold',
@@ -627,12 +644,18 @@ function inicializarNotas() {
                 const vN1 = parseInt(inN1.value) || 0;
                 if (vN1 > 0 && vN1 < 7) {
                     inI1.disabled = false;
+                } else if (vN1 === 0) {
+                    // Si no hay nota, también habilitar para poder ingresar intensificación
+                    inI1.disabled = false;
                 }
             }
             
             if (inN2 && inI2) {
                 const vN2 = parseInt(inN2.value) || 0;
                 if (vN2 > 0 && vN2 < 7) {
+                    inI2.disabled = false;
+                } else if (vN2 === 0) {
+                    // Si no hay nota, también habilitar para poder ingresar intensificación
                     inI2.disabled = false;
                 }
             }
