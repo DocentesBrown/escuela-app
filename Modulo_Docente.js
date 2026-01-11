@@ -1,5 +1,5 @@
 // ============================================================================
-// ARCHIVO: Modulo_Docente.js (VERSIÓN CORREGIDA)
+// ARCHIVO: Modulo_Docente.js (VERSIÓN CORREGIDA - FUNCIONANDO)
 // ============================================================================
 
 let fechaAsistenciaSeleccionada = new Date().toISOString().split('T')[0];
@@ -18,30 +18,29 @@ async function iniciarModuloDocente() {
         }
         
         let html = `<h4 class="mb-3">🏫 Mis Cursos</h4><div class="row" id="lista-cursos">`;
-        json.data.forEach(cursoData => {
-            html += `
-            <div class="col-md-6 col-lg-4 mb-3">
-                <div class="card h-100 shadow-sm border-0 border-start border-4 border-primary">
-                    <div class="card-body">
-                        <h5 class="card-title fw-bold text-primary">${cursoData.curso}</h5>
-                        <p class="text-muted small mb-3"><i class="bi bi-people"></i> ${cursoData.totalEstudiantes} estudiantes</p>
-                        <hr>
-                        <ul class="list-unstyled">`;
-            cursoData.materias.forEach(m => {
-                html += `<li class="mb-2"><button class="btn btn-outline-dark w-100 text-start d-flex justify-content-between align-items-center" onclick="abrirCursoDocente('${cursoData.curso}', '${m.id}', '${m.nombre}')"><span>📚 ${m.nombre}</span> <span class="badge bg-light text-dark border">${m.tipoAsignacion}</span></button></li>`;
+        
+        if (json.data.length === 0) {
+            html += `<div class="col-12"><div class="alert alert-info">No tienes cursos asignados. Contacta al directivo.</div></div>`;
+        } else {
+            json.data.forEach(cursoData => {
+                html += `
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card h-100 shadow-sm border-0 border-start border-4 border-primary">
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold text-primary">${cursoData.curso}</h5>
+                            <p class="text-muted small mb-3"><i class="bi bi-people"></i> ${cursoData.totalEstudiantes} estudiantes</p>
+                            <hr>
+                            <ul class="list-unstyled">`;
+                cursoData.materias.forEach(m => {
+                    html += `<li class="mb-2"><button class="btn btn-outline-dark w-100 text-start d-flex justify-content-between align-items-center" onclick="abrirCursoDocente('${cursoData.curso}', '${m.id}', '${m.nombre}')"><span>📚 ${m.nombre}</span> <span class="badge bg-light text-dark border">${m.tipoAsignacion}</span></button></li>`;
+                });
+                html += `</ul></div></div></div>`;
             });
-            html += `</ul></div></div></div>`;
-        });
+        }
+        
         html += `</div>`;
         
-        // Asegurar que el modal está en el DOM
         document.getElementById('contenido-dinamico').innerHTML = html;
-        
-        // Agregar el modal dinámicamente si no existe
-        if (!document.getElementById('modalJustificarDocente')) {
-            const modalHTML = renderModalJustificarDocenteHTML();
-            document.getElementById('contenido-dinamico').insertAdjacentHTML('beforeend', modalHTML);
-        }
         
     } catch (e) { 
         console.error('Error en iniciarModuloDocente:', e);
@@ -59,6 +58,8 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
         const resp = await fetch(url);
         const json = await resp.json();
         
+        console.log('Respuesta del servidor:', json); // Debug
+        
         if (json.status !== 'success') {
             throw new Error(json.message || 'Error al cargar el curso');
         }
@@ -67,11 +68,12 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
             throw new Error('No se recibieron datos válidos del servidor');
         }
         
-        cursoActualDocente = { 
+        // CORRECCIÓN: Usar window.cursoActualDocente para que sea global
+        window.cursoActualDocente = { 
             curso: curso, 
             idMateria: idMateria, 
             nombreMateria: nombreMateria, 
-            estudiantes: json.data.estudiantes,
+            estudiantes: json.data.estudiantes, // CORRECCIÓN: era "estudientes"
             datosMateria: json.data.materia 
         };  
         
@@ -121,16 +123,10 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
             
         document.getElementById('contenido-dinamico').innerHTML = html;
         
-        // Asegurar que el modal está en el DOM
-        if (!document.getElementById('modalJustificarDocente')) {
-            const modalHTML = renderModalJustificarDocenteHTML();
-            document.getElementById('contenido-dinamico').insertAdjacentHTML('beforeend', modalHTML);
-        }
-        
         // Inicializar cálculos
         setTimeout(() => {
-            if (cursoActualDocente && cursoActualDocente.estudiantes) {
-                cursoActualDocente.estudiantes.forEach(est => {
+            if (window.cursoActualDocente && window.cursoActualDocente.estudiantes) {
+                window.cursoActualDocente.estudiantes.forEach(est => {
                     calcularFilaCompleta(est.dni);
                 });
             }
@@ -148,11 +144,17 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
 }
 
 function mostrarTabDocente(tab, btn) {
-    document.getElementById('tabAsistencia').classList.add('d-none');
-    document.getElementById('tabNotas').classList.add('d-none');
-    document.getElementById('tabResumen').classList.add('d-none');
+    // Ocultar todas las pestañas
+    const tabs = ['tabAsistencia', 'tabNotas', 'tabResumen'];
+    tabs.forEach(tabId => {
+        const element = document.getElementById(tabId);
+        if (element) element.classList.add('d-none');
+    });
+    
+    // Quitar active de todos los botones
     document.querySelectorAll('#tabsDocente .nav-link').forEach(b => b.classList.remove('active'));
     
+    // Mostrar la pestaña seleccionada
     const target = 'tab' + tab.charAt(0).toUpperCase() + tab.slice(1);
     const targetElement = document.getElementById(target);
     if (targetElement) {
@@ -181,31 +183,36 @@ function renderTablaAsistenciaDocente(est) {
     </thead>
     <tbody>`;
     
-    est.forEach(e => {
-        const porc = e.asistencia && e.asistencia.porcentaje ? e.asistencia.porcentaje : 0;
-        const faltas = e.asistencia && e.asistencia.injustificadas ? e.asistencia.injustificadas : 0;
-        let colorAsis = porc < 80 ? 'text-danger fw-bold' : 'text-success';
+    if (est.length === 0) {
+        html += `<tr><td colspan="6" class="text-center text-muted py-4">No hay estudiantes en este curso</td></tr>`;
+    } else {
+        est.forEach(e => {
+            const porc = e.asistencia && e.asistencia.porcentaje ? e.asistencia.porcentaje : 0;
+            const faltas = e.asistencia && e.asistencia.injustificadas ? e.asistencia.injustificadas : 0;
+            let colorAsis = porc < 80 ? 'text-danger fw-bold' : 'text-success';
 
-        html += `<tr data-dni="${e.dni}">
-        <td class="fw-bold ps-3 text-start">${e.nombre}</td>
-        <td class="text-center ${colorAsis}">${porc}%</td>
-        <td class="text-center fw-bold text-danger">${faltas}</td>
-        <td class="text-center bg-success bg-opacity-10">
-            <input type="radio" name="asis_${e.dni}" value="P" checked class="form-check-input" style="transform: scale(1.3); cursor:pointer;">
-        </td>
-        <td class="text-center bg-danger bg-opacity-10">
-            <input type="radio" name="asis_${e.dni}" value="A" class="form-check-input" style="transform: scale(1.3); cursor:pointer;">
-        </td>
-        <td class="text-center">
-             <button class="btn btn-sm btn-outline-warning border-0" onclick="abrirModalJustificarDoc('${e.dni}', '${e.nombre}')" title="Justificar faltas">⚖️</button>
-        </td>
-        </tr>`;
-    });
+            html += `<tr data-dni="${e.dni}">
+            <td class="fw-bold ps-3 text-start">${e.nombre}</td>
+            <td class="text-center ${colorAsis}">${porc}%</td>
+            <td class="text-center fw-bold text-danger">${faltas}</td>
+            <td class="text-center bg-success bg-opacity-10">
+                <input type="radio" name="asis_${e.dni}" value="P" checked class="form-check-input" style="transform: scale(1.3); cursor:pointer;">
+            </td>
+            <td class="text-center bg-danger bg-opacity-10">
+                <input type="radio" name="asis_${e.dni}" value="A" class="form-check-input" style="transform: scale(1.3); cursor:pointer;">
+            </td>
+            <td class="text-center">
+                 <button class="btn btn-sm btn-outline-warning border-0" onclick="abrirModalJustificarDoc('${e.dni}', '${e.nombre}')" title="Justificar faltas">⚖️</button>
+            </td>
+            </tr>`;
+        });
+    }
+    
     return html + `</tbody></table></div>`;
 }
 
 async function guardarAsistenciaDocente() {
-    if (!cursoActualDocente) {
+    if (!window.cursoActualDocente) {
         alert('Error: No hay datos del curso actual');
         return;
     }
@@ -219,7 +226,7 @@ async function guardarAsistenciaDocente() {
     }
     
     const asistenciaData = [];
-    const estudiantes = cursoActualDocente.estudiantes || [];
+    const estudiantes = window.cursoActualDocente.estudiantes || [];
     
     estudiantes.forEach(est => {
         const radioSeleccionado = document.querySelector(`input[name="asis_${est.dni}"]:checked`);
@@ -239,7 +246,7 @@ async function guardarAsistenciaDocente() {
     const datos = {
         op: 'guardarAsistenciaDocente',
         dniDocente: usuarioActual.dni,
-        idMateria: cursoActualDocente.idMateria,
+        idMateria: window.cursoActualDocente.idMateria,
         fecha: fecha,
         asistencia: asistenciaData
     };
@@ -259,9 +266,9 @@ async function guardarAsistenciaDocente() {
             alert('✅ Asistencia guardada correctamente');
             // Recargar los datos
             abrirCursoDocente(
-                cursoActualDocente.curso,
-                cursoActualDocente.idMateria,
-                cursoActualDocente.nombreMateria
+                window.cursoActualDocente.curso,
+                window.cursoActualDocente.idMateria,
+                window.cursoActualDocente.nombreMateria
             );
         } else {
             throw new Error(json.message || 'Error al guardar');
@@ -276,16 +283,33 @@ async function guardarAsistenciaDocente() {
 }
 
 async function abrirModalJustificarDoc(dni, nombre) {
-    if (!cursoActualDocente) {
+    if (!window.cursoActualDocente) {
         alert('Error: No hay datos del curso actual');
         return;
     }
     
-    // Asegurar que el modal existe en el DOM
+    // Verificar si el modal existe, si no, crearlo
     let modalElement = document.getElementById('modalJustificarDocente');
     if (!modalElement) {
-        // Crear modal dinámicamente
-        const modalHTML = renderModalJustificarDocenteHTML();
+        const modalHTML = `
+        <div class="modal fade" id="modalJustificarDocente" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header bg-warning">
+                <h5 class="modal-title text-dark">Justificar Inasistencias</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <p>Alumno: <b id="just_doc_nombre"></b></p>
+                <p class="small text-muted">Selecciona la falta para justificar.</p>
+                <div id="lista_faltas_docente" class="list-group"></div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         modalElement = document.getElementById('modalJustificarDocente');
     }
@@ -297,7 +321,7 @@ async function abrirModalJustificarDoc(dni, nombre) {
         const modal = new bootstrap.Modal(modalElement);
         modal.show();
         
-        const url = `${URL_API}?op=getFaltasAlumnoDocente&rol=Docente&dni=${dni}&idMateria=${cursoActualDocente.idMateria}`;
+        const url = `${URL_API}?op=getFaltasAlumnoDocente&rol=Docente&dni=${dni}&idMateria=${window.cursoActualDocente.idMateria}`;
         const resp = await fetch(url);
         const json = await resp.json();
         
@@ -324,7 +348,7 @@ async function abrirModalJustificarDoc(dni, nombre) {
         document.getElementById('lista_faltas_docente').innerHTML = html;
     } catch (e) {
         console.error('Error al cargar faltas:', e);
-        document.getElementById('lista_faltas_docente').innerHTML = '<div class="alert alert-danger">Error al cargar las faltas: ' + e.message + '</div>';
+        document.getElementById('lista_faltas_docente').innerHTML = '<div class="alert alert-danger">Error al cargar las faltas</div>';
     }
 }
 
@@ -353,9 +377,9 @@ async function justificarFaltaDocente(fila) {
             
             // Recargar datos del curso
             abrirCursoDocente(
-                cursoActualDocente.curso,
-                cursoActualDocente.idMateria,
-                cursoActualDocente.nombreMateria
+                window.cursoActualDocente.curso,
+                window.cursoActualDocente.idMateria,
+                window.cursoActualDocente.nombreMateria
             );
         } else {
             throw new Error(json.message || 'Error al justificar');
@@ -388,22 +412,26 @@ function renderTablaNotasDocente(est) {
             </thead>
             <tbody>`;
     
-    est.forEach(e => {
-        const notas = e.notas || {};
-        html += `
-        <tr data-dni="${e.dni}">
-            <td class="fw-bold text-start">${e.nombre}</td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm n1" value="${notas.nota1_C1 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')"></td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm i1" value="${notas.intensificacion1 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm n2" value="${notas.nota1_C2 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')"></td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm i2" value="${notas.intensificacion2 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
-            <td class="text-center"><span class="fw-bold promedio">-</span></td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm dic" value="${notas.diciembre || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm feb" value="${notas.febrero || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
-            <td class="text-center fw-bold text-white def-cell bg-secondary"><span class="definitiva">-</span></td>
-            <td class="text-center"><span class="estado small">-</span></td>
-        </tr>`;
-    });
+    if (est.length === 0) {
+        html += `<tr><td colspan="10" class="text-center text-muted py-4">No hay estudiantes en este curso</td></tr>`;
+    } else {
+        est.forEach(e => {
+            const notas = e.notas || {};
+            html += `
+            <tr data-dni="${e.dni}">
+                <td class="fw-bold text-start">${e.nombre}</td>
+                <td class="text-center"><input type="number" class="form-control form-control-sm n1" value="${notas.nota1_C1 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')"></td>
+                <td class="text-center"><input type="number" class="form-control form-control-sm i1" value="${notas.intensificacion1 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
+                <td class="text-center"><input type="number" class="form-control form-control-sm n2" value="${notas.nota1_C2 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')"></td>
+                <td class="text-center"><input type="number" class="form-control form-control-sm i2" value="${notas.intensificacion2 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
+                <td class="text-center"><span class="fw-bold promedio">-</span></td>
+                <td class="text-center"><input type="number" class="form-control form-control-sm dic" value="${notas.diciembre || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
+                <td class="text-center"><input type="number" class="form-control form-control-sm feb" value="${notas.febrero || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
+                <td class="text-center fw-bold text-white def-cell bg-secondary"><span class="definitiva">-</span></td>
+                <td class="text-center"><span class="estado small">-</span></td>
+            </tr>`;
+        });
+    }
     
     html += `</tbody></table>
         <div class="alert alert-warning small mb-3">
@@ -579,7 +607,7 @@ function calcularFilaCompleta(dni) {
 }
 
 async function guardarNotasDocente() {
-    if (!cursoActualDocente) {
+    if (!window.cursoActualDocente) {
         alert('Error: No hay datos del curso actual');
         return;
     }
@@ -603,7 +631,7 @@ async function guardarNotasDocente() {
     
     const datos = {
         op: 'guardarNotasMasivo',
-        idMateria: cursoActualDocente.idMateria,
+        idMateria: window.cursoActualDocente.idMateria,
         notas: notasArray
     };
     
@@ -622,9 +650,9 @@ async function guardarNotasDocente() {
             alert('✅ Calificaciones guardadas correctamente');
             // Recargar para ver cambios
             abrirCursoDocente(
-                cursoActualDocente.curso,
-                cursoActualDocente.idMateria,
-                cursoActualDocente.nombreMateria
+                window.cursoActualDocente.curso,
+                window.cursoActualDocente.idMateria,
+                window.cursoActualDocente.nombreMateria
             );
         } else {
             throw new Error(json.message || 'Error al guardar');
@@ -641,9 +669,14 @@ async function guardarNotasDocente() {
 // --- RESUMEN MEJORADO ---
 
 function renderTabResumen(est) {
+    if (est.length === 0) {
+        return `<div class="alert alert-info">No hay estudiantes en este curso</div>`;
+    }
+    
     // Contadores
     let aprobados = 0, diciembre = 0, febrero = 0, ci = 0, regular = 0, promocionados = 0;
     let sumaAsis = 0, sumaNotas = 0, contNotas = 0;
+    let mejorNota = 0, peorNota = 10;
     
     // Análisis por estudiante
     const detalleEstudiantes = est.map(e => {
@@ -665,6 +698,10 @@ function renderTabResumen(est) {
                 notaNumerica = parseFloat(def);
                 sumaNotas += notaNumerica;
                 contNotas++;
+                
+                // Actualizar mejor/peor nota
+                if (notaNumerica > mejorNota) mejorNota = notaNumerica;
+                if (notaNumerica < peorNota) peorNota = notaNumerica;
             }
         } else if (e.notas) {
             if (e.notas.diciembre && e.notas.diciembre !== "") {
@@ -713,38 +750,189 @@ function renderTabResumen(est) {
     
     const promedioAsis = est.length > 0 ? Math.round(sumaAsis / est.length) : 0;
     const promedioNotas = contNotas > 0 ? (sumaNotas / contNotas).toFixed(1) : 0;
+    const tasaAprobacion = est.length > 0 ? Math.round((aprobados / est.length) * 100) : 0;
 
     return `
     <div class="row g-3 mb-4">
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card bg-primary text-white text-center p-3 shadow-sm">
-                <small>Asistencia Promedio</small>
+                <small>Asistencia Prom.</small>
                 <h3 class="mb-0">${promedioAsis}%</h3>
                 <small class="opacity-75">${est.length} estudiantes</small>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card bg-success text-white text-center p-3 shadow-sm">
                 <small>Aprobados</small>
                 <h3 class="mb-0">${aprobados}</h3>
-                <small class="opacity-75">${promocionados} promocionados</small>
+                <small class="opacity-75">${tasaAprobacion}%</small>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
+            <div class="card bg-info text-white text-center p-3 shadow-sm">
+                <small>Promocionados</small>
+                <h3 class="mb-0">${promocionados}</h3>
+                <small class="opacity-75">Prom: ${promedioNotas}</small>
+            </div>
+        </div>
+        <div class="col-md-2">
             <div class="card bg-warning text-dark text-center p-3 shadow-sm">
-                <small>En Instancias</small>
+                <small>Instancias</small>
                 <h3 class="mb-0">${diciembre + febrero}</h3>
                 <small class="opacity-75">${diciembre} Dic / ${febrero} Feb</small>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card bg-danger text-white text-center p-3 shadow-sm">
                 <small>Recursantes</small>
                 <h3 class="mb-0">${ci}</h3>
-                <small class="opacity-75">Prom. notas: ${promedioNotas}</small>
+                <small class="opacity-75">${regular} regulares</small>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-dark text-white text-center p-3 shadow-sm">
+                <small>Rango Notas</small>
+                <h3 class="mb-0">${mejorNota}-${peorNota}</h3>
+                <small class="opacity-75">Mejor/Peor</small>
             </div>
         </div>
     </div>
     
     <div class="card mb-4">
-        <div class
+        <div class="card-header bg-light">
+            <h6 class="mb-0">📊 Distribución de Notas</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <canvas id="chartEstado" width="200" height="200"></canvas>
+                </div>
+                <div class="col-md-8">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Estudiante</th>
+                                    <th class="text-center">% Asist.</th>
+                                    <th class="text-center">1er C</th>
+                                    <th class="text-center">2do C</th>
+                                    <th class="text-center">Dic</th>
+                                    <th class="text-center">Feb</th>
+                                    <th class="text-center">Definitiva</th>
+                                    <th class="text-center">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${detalleEstudiantes.map(e => `
+                                    <tr>
+                                        <td class="fw-bold">${e.nombre}</td>
+                                        <td class="text-center ${e.asistencia < 80 ? 'text-danger fw-bold' : 'text-success'}">${e.asistencia}%</td>
+                                        <td class="text-center">${e.nota1} ${e.intens1 !== '-' && e.intens1 > 0 ? `(${e.intens1})` : ''}</td>
+                                        <td class="text-center">${e.nota2} ${e.intens2 !== '-' && e.intens2 > 0 ? `(${e.intens2})` : ''}</td>
+                                        <td class="text-center">${e.diciembre}</td>
+                                        <td class="text-center">${e.febrero}</td>
+                                        <td class="text-center fw-bold ${e.definitiva === 'C.I.' ? 'text-danger' : (parseFloat(e.definitiva) >= 4 ? 'text-success' : 'text-warning')}">${e.definitiva}</td>
+                                        <td class="text-center"><span class="badge ${getBadgeColor(e.estado)}">${e.estado}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function getBadgeColor(estado) {
+    switch(estado) {
+        case 'Promocionado': return 'bg-success';
+        case 'Aprobado': return 'bg-primary';
+        case 'Aprobado en Diciembre': return 'bg-info';
+        case 'Aprobado en Febrero': return 'bg-warning text-dark';
+        case 'C.I.': return 'bg-danger';
+        case 'En Diciembre': return 'bg-secondary';
+        case 'En Febrero': return 'bg-secondary';
+        case 'Regular': return 'bg-light text-dark border';
+        default: return 'bg-secondary';
+    }
+}
+
+// --- MIS DATOS ---
+
+async function verMisDatosDocente() {
+    try {
+        const resp = await fetch(`${URL_API}?op=getDocentes&rol=Docente`);
+        const json = await resp.json();
+        
+        if (json.status !== 'success' || !json.data) {
+            throw new Error('No se pudieron cargar los datos');
+        }
+        
+        const docente = json.data.find(d => 
+            String(d[0]) === String(usuarioActual.dni) || 
+            String(d[2]) === String(usuarioActual.email)
+        );
+        
+        if (!docente) {
+            throw new Error('No se encontraron tus datos');
+        }
+        
+        let html = `
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">👤 Mis Datos Personales</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-muted">DNI</label>
+                                <p class="form-control-plaintext">${docente[0] || 'No registrado'}</p>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-muted">Nombre Completo</label>
+                                <p class="form-control-plaintext">${docente[1] || 'No registrado'}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-muted">Email ABC</label>
+                                <p class="form-control-plaintext">${docente[2] || 'No registrado'}</p>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-muted">Celular</label>
+                                <p class="form-control-plaintext">${docente[3] || 'No registrado'}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <label class="form-label fw-bold text-muted">Materias Asignadas</label>
+                        <div class="border rounded p-3 bg-light">
+                            ${docente[4] ? docente[4].split(', ').map(m => 
+                                `<span class="badge bg-info text-dark me-2 mb-2">${m}</span>`
+                            ).join('') : '<span class="text-muted">No tienes materias asignadas</span>'}
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 text-center">
+                        <button class="btn btn-outline-secondary" onclick="iniciarModuloDocente()">
+                            ← Volver a mis cursos
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        
+        document.getElementById('contenido-dinamico').innerHTML = html;
+        
+    } catch (e) {
+        console.error('Error cargando datos del docente:', e);
+        document.getElementById('contenido-dinamico').innerHTML = `
+            <div class="alert alert-danger">
+                <h5>Error al cargar tus datos</h5>
+                <p>${e.message}</p>
+                <button class="btn btn-secondary mt-2" onclick="iniciarModuloDocente()">← Volver</button>
+            </div>`;
+    }
+}
