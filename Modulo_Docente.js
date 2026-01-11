@@ -1,8 +1,9 @@
 // ============================================================================
-// ARCHIVO: Modulo_Docente.js
+// ARCHIVO: Modulo_Docente.js (VERSIÓN CORREGIDA)
 // ============================================================================
 
 let fechaAsistenciaSeleccionada = new Date().toISOString().split('T')[0];
+let cursoActualDocente = null;
 
 async function iniciarModuloDocente() {
     document.getElementById('contenido-dinamico').innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Cargando cursos asignados...</p></div>`;
@@ -33,8 +34,14 @@ async function iniciarModuloDocente() {
         });
         html += `</div>`;
         
-        html += renderModalJustificarDocenteHTML();
+        // Asegurar que el modal está en el DOM
         document.getElementById('contenido-dinamico').innerHTML = html;
+        
+        // Agregar el modal dinámicamente si no existe
+        if (!document.getElementById('modalJustificarDocente')) {
+            const modalHTML = renderModalJustificarDocenteHTML();
+            document.getElementById('contenido-dinamico').insertAdjacentHTML('beforeend', modalHTML);
+        }
         
     } catch (e) { 
         console.error('Error en iniciarModuloDocente:', e);
@@ -46,9 +53,8 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
     document.getElementById('contenido-dinamico').innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Cargando datos...</p></div>`;
     
     try {
-        // Usar el endpoint correcto
         const url = `${URL_API}?op=getEstudiantesConDatosCompletos&rol=Docente&dniDocente=${usuarioActual.dni}&curso=${encodeURIComponent(curso)}&idMateria=${idMateria}`;
-        console.log('URL de solicitud:', url); // Para debug
+        console.log('URL de solicitud:', url);
         
         const resp = await fetch(url);
         const json = await resp.json();
@@ -61,11 +67,11 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
             throw new Error('No se recibieron datos válidos del servidor');
         }
         
-        window.cursoActualDocente = { 
-            curso, 
-            idMateria, 
-            nombreMateria, 
-            estudiantes: json.data.estudientes,
+        cursoActualDocente = { 
+            curso: curso, 
+            idMateria: idMateria, 
+            nombreMateria: nombreMateria, 
+            estudiantes: json.data.estudiantes,
             datosMateria: json.data.materia 
         };  
         
@@ -99,7 +105,10 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
 
                     <div id="tabNotas" class="d-none">
                         <div class="alert alert-info small mb-2">
-                            <i class="bi bi-info-circle"></i> <b>Nota:</b> Si un cuatrimestre no está aprobado (nota < 7 e intensificación < 4), habilita Diciembre automáticamente.
+                            <i class="bi bi-info-circle"></i> <b>Lógica del sistema:</b><br>
+                            • Cuatrimestre se aprueba con 7 (Nota) o 4 (Intensificación)<br>
+                            • Si ambos cuatrimestres aprobados y Promedio ≥ 7 → Nota Definitiva<br>
+                            • Si no → Diciembre (aprueba con 4) → Febrero → C.I.
                         </div>
                         ${renderTablaNotasDocente(json.data.estudiantes)}
                     </div>
@@ -109,9 +118,23 @@ async function abrirCursoDocente(curso, idMateria, nombreMateria) {
                     </div>
                 </div>
             </div>`;
+            
         document.getElementById('contenido-dinamico').innerHTML = html;
         
-        setTimeout(recalcularTodoAlInicio, 500);
+        // Asegurar que el modal está en el DOM
+        if (!document.getElementById('modalJustificarDocente')) {
+            const modalHTML = renderModalJustificarDocenteHTML();
+            document.getElementById('contenido-dinamico').insertAdjacentHTML('beforeend', modalHTML);
+        }
+        
+        // Inicializar cálculos
+        setTimeout(() => {
+            if (cursoActualDocente && cursoActualDocente.estudiantes) {
+                cursoActualDocente.estudiantes.forEach(est => {
+                    calcularFilaCompleta(est.dni);
+                });
+            }
+        }, 300);
 
     } catch (e) { 
         console.error('Error en abrirCursoDocente:', e);
@@ -131,13 +154,15 @@ function mostrarTabDocente(tab, btn) {
     document.querySelectorAll('#tabsDocente .nav-link').forEach(b => b.classList.remove('active'));
     
     const target = 'tab' + tab.charAt(0).toUpperCase() + tab.slice(1);
-    document.getElementById(target).classList.remove('d-none');
+    const targetElement = document.getElementById(target);
+    if (targetElement) {
+        targetElement.classList.remove('d-none');
+    }
     btn.classList.add('active');
 }
 
 function cambiarFechaAsistencia(fecha) {
     fechaAsistenciaSeleccionada = fecha;
-    console.log('Fecha de asistencia cambiada a:', fecha);
 }
 
 // --- ASISTENCIA ---
@@ -151,7 +176,8 @@ function renderTablaAsistenciaDocente(est) {
             <th style="width: 80px;">Faltas</th>
             <th style="width: 80px;" class="bg-success">P</th>
             <th style="width: 80px;" class="bg-danger">A</th>
-            <th style="width: 60px;">Edit</th> </tr>
+            <th style="width: 60px;">Justificar</th>
+        </tr>
     </thead>
     <tbody>`;
     
@@ -171,7 +197,7 @@ function renderTablaAsistenciaDocente(est) {
             <input type="radio" name="asis_${e.dni}" value="A" class="form-check-input" style="transform: scale(1.3); cursor:pointer;">
         </td>
         <td class="text-center">
-             <button class="btn btn-sm btn-outline-secondary border-0" onclick="abrirModalJustificarDoc('${e.dni}', '${e.nombre}')">✏️</button>
+             <button class="btn btn-sm btn-outline-warning border-0" onclick="abrirModalJustificarDoc('${e.dni}', '${e.nombre}')" title="Justificar faltas">⚖️</button>
         </td>
         </tr>`;
     });
@@ -179,7 +205,7 @@ function renderTablaAsistenciaDocente(est) {
 }
 
 async function guardarAsistenciaDocente() {
-    if (!window.cursoActualDocente) {
+    if (!cursoActualDocente) {
         alert('Error: No hay datos del curso actual');
         return;
     }
@@ -193,7 +219,7 @@ async function guardarAsistenciaDocente() {
     }
     
     const asistenciaData = [];
-    const estudiantes = window.cursoActualDocente.estudiantes || [];
+    const estudiantes = cursoActualDocente.estudiantes || [];
     
     estudiantes.forEach(est => {
         const radioSeleccionado = document.querySelector(`input[name="asis_${est.dni}"]:checked`);
@@ -213,7 +239,7 @@ async function guardarAsistenciaDocente() {
     const datos = {
         op: 'guardarAsistenciaDocente',
         dniDocente: usuarioActual.dni,
-        idMateria: window.cursoActualDocente.idMateria,
+        idMateria: cursoActualDocente.idMateria,
         fecha: fecha,
         asistencia: asistenciaData
     };
@@ -233,9 +259,9 @@ async function guardarAsistenciaDocente() {
             alert('✅ Asistencia guardada correctamente');
             // Recargar los datos
             abrirCursoDocente(
-                window.cursoActualDocente.curso,
-                window.cursoActualDocente.idMateria,
-                window.cursoActualDocente.nombreMateria
+                cursoActualDocente.curso,
+                cursoActualDocente.idMateria,
+                cursoActualDocente.nombreMateria
             );
         } else {
             throw new Error(json.message || 'Error al guardar');
@@ -250,20 +276,28 @@ async function guardarAsistenciaDocente() {
 }
 
 async function abrirModalJustificarDoc(dni, nombre) {
-    if (!window.cursoActualDocente) {
+    if (!cursoActualDocente) {
         alert('Error: No hay datos del curso actual');
         return;
     }
     
+    // Asegurar que el modal existe en el DOM
+    let modalElement = document.getElementById('modalJustificarDocente');
+    if (!modalElement) {
+        // Crear modal dinámicamente
+        const modalHTML = renderModalJustificarDocenteHTML();
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        modalElement = document.getElementById('modalJustificarDocente');
+    }
+    
     document.getElementById('just_doc_nombre').innerText = nombre;
-    document.getElementById('lista_faltas_docente').innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm"></div> Buscando faltas...</div>';
+    document.getElementById('lista_faltas_docente').innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div><br>Buscando faltas...</div>';
     
     try {
-        const modalEl = document.getElementById('modalJustificarDocente');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalElement);
         modal.show();
         
-        const url = `${URL_API}?op=getFaltasAlumnoDocente&rol=Docente&dni=${dni}&idMateria=${window.cursoActualDocente.idMateria}`;
+        const url = `${URL_API}?op=getFaltasAlumnoDocente&rol=Docente&dni=${dni}&idMateria=${cursoActualDocente.idMateria}`;
         const resp = await fetch(url);
         const json = await resp.json();
         
@@ -273,7 +307,10 @@ async function abrirModalJustificarDoc(dni, nombre) {
             json.data.forEach(falta => {
                 html += `
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    <span class="fw-bold">${falta.fecha}</span>
+                    <div>
+                        <span class="fw-bold">${falta.fecha}</span>
+                        <span class="badge bg-danger ms-2">Ausente</span>
+                    </div>
                     <button class="btn btn-sm btn-success" onclick="justificarFaltaDocente(${falta.fila})">
                         Justificar ✅
                     </button>
@@ -287,7 +324,7 @@ async function abrirModalJustificarDoc(dni, nombre) {
         document.getElementById('lista_faltas_docente').innerHTML = html;
     } catch (e) {
         console.error('Error al cargar faltas:', e);
-        document.getElementById('lista_faltas_docente').innerHTML = '<div class="alert alert-danger">Error al cargar las faltas</div>';
+        document.getElementById('lista_faltas_docente').innerHTML = '<div class="alert alert-danger">Error al cargar las faltas: ' + e.message + '</div>';
     }
 }
 
@@ -309,16 +346,16 @@ async function justificarFaltaDocente(fila) {
         
         if (json.status === 'success') {
             alert('✅ Falta justificada correctamente');
-            // Cerrar modal y recargar
+            // Cerrar modal
             const modalEl = document.getElementById('modalJustificarDocente');
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
             
             // Recargar datos del curso
             abrirCursoDocente(
-                window.cursoActualDocente.curso,
-                window.cursoActualDocente.idMateria,
-                window.cursoActualDocente.nombreMateria
+                cursoActualDocente.curso,
+                cursoActualDocente.idMateria,
+                cursoActualDocente.nombreMateria
             );
         } else {
             throw new Error(json.message || 'Error al justificar');
@@ -329,7 +366,7 @@ async function justificarFaltaDocente(fila) {
     }
 }
 
-// --- CALIFICACIONES ---
+// --- CALIFICACIONES - LÓGICA EDUCATIVA CORRECTA ---
 
 function renderTablaNotasDocente(est) {
     let html = `
@@ -346,6 +383,7 @@ function renderTablaNotasDocente(est) {
                     <th>Dic</th>
                     <th>Feb</th>
                     <th>Def</th>
+                    <th>Estado</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -355,18 +393,22 @@ function renderTablaNotasDocente(est) {
         html += `
         <tr data-dni="${e.dni}">
             <td class="fw-bold text-start">${e.nombre}</td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm n1" value="${notas.nota1_C1 || ''}" min="0" max="10" step="0.5" onchange="calcularFila('${e.dni}')"></td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm i1" value="${notas.intensificacion1 || ''}" min="0" max="10" step="0.5" onchange="calcularFila('${e.dni}')" disabled></td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm n2" value="${notas.nota1_C2 || ''}" min="0" max="10" step="0.5" onchange="calcularFila('${e.dni}')"></td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm i2" value="${notas.intensificacion2 || ''}" min="0" max="10" step="0.5" onchange="calcularFila('${e.dni}')" disabled></td>
+            <td class="text-center"><input type="number" class="form-control form-control-sm n1" value="${notas.nota1_C1 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')"></td>
+            <td class="text-center"><input type="number" class="form-control form-control-sm i1" value="${notas.intensificacion1 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
+            <td class="text-center"><input type="number" class="form-control form-control-sm n2" value="${notas.nota1_C2 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')"></td>
+            <td class="text-center"><input type="number" class="form-control form-control-sm i2" value="${notas.intensificacion2 || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
             <td class="text-center"><span class="fw-bold promedio">-</span></td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm dic" value="${notas.diciembre || ''}" min="0" max="10" step="0.5" onchange="calcularFila('${e.dni}')" disabled></td>
-            <td class="text-center"><input type="number" class="form-control form-control-sm feb" value="${notas.febrero || ''}" min="0" max="10" step="0.5" onchange="calcularFila('${e.dni}')" disabled></td>
+            <td class="text-center"><input type="number" class="form-control form-control-sm dic" value="${notas.diciembre || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
+            <td class="text-center"><input type="number" class="form-control form-control-sm feb" value="${notas.febrero || ''}" min="0" max="10" step="0.5" oninput="calcularFilaCompleta('${e.dni}')" disabled></td>
             <td class="text-center fw-bold text-white def-cell bg-secondary"><span class="definitiva">-</span></td>
+            <td class="text-center"><span class="estado small">-</span></td>
         </tr>`;
     });
     
     html += `</tbody></table>
+        <div class="alert alert-warning small mb-3">
+            <b>Instrucciones:</b> Ingresa notas (0-10). Si una nota de cuatrimestre es menor a 7, se habilita la intensificación.
+        </div>
         <div class="text-end mt-3">
             <button class="btn btn-primary" onclick="guardarNotasDocente()">💾 Guardar Todas las Calificaciones</button>
         </div>
@@ -375,20 +417,11 @@ function renderTablaNotasDocente(est) {
     return html;
 }
 
-function recalcularTodoAlInicio() {
-    if (!window.cursoActualDocente || !window.cursoActualDocente.estudiantes) return;
-    
-    window.cursoActualDocente.estudientes.forEach(e => {
-        if (e && e.dni) {
-            calcularFila(e.dni);
-        }
-    });
-}
-
-function calcularFila(dni) {
+function calcularFilaCompleta(dni) {
     const row = document.querySelector(`tr[data-dni="${dni}"]`);
     if (!row) return;
 
+    // Obtener elementos
     const inN1 = row.querySelector('.n1');
     const inI1 = row.querySelector('.i1');
     const inN2 = row.querySelector('.n2');
@@ -397,92 +430,156 @@ function calcularFila(dni) {
     const inFeb = row.querySelector('.feb');
     const spanProm = row.querySelector('.promedio');
     const spanDef = row.querySelector('.definitiva');
+    const spanEstado = row.querySelector('.estado');
     const tdDef = row.querySelector('.def-cell');
 
-    let vN1 = parseFloat(inN1.value) || 0;
-    let vN2 = parseFloat(inN2.value) || 0;
-    
-    // Regla: Nota < 7 habilita intensificación
-    if (inN1.value !== "" && vN1 < 7) {
-        inI1.disabled = false;
-    } else {
-        inI1.disabled = true;
-        inI1.value = '';
-    }
-    
-    if (inN2.value !== "" && vN2 < 7) {
-        inI2.disabled = false;
-    } else {
-        inI2.disabled = true;
-        inI2.value = '';
-    }
-
+    // Obtener valores
+    const vN1 = parseFloat(inN1.value) || 0;
+    const vN2 = parseFloat(inN2.value) || 0;
     let vI1 = parseFloat(inI1.value) || 0;
     let vI2 = parseFloat(inI2.value) || 0;
+    const vDic = parseFloat(inDic.value) || 0;
+    const vFeb = parseFloat(inFeb.value) || 0;
 
-    // ¿Aprobó el cuatrimestre?
-    let aprobadoC1 = (vN1 >= 7) || (vI1 >= 4);
-    let aprobadoC2 = (vN2 >= 7) || (vI2 >= 4);
+    // LÓGICA DE INTENSIFICACIÓN
+    // Si la nota del cuatrimestre es < 7, habilitar intensificación
+    if (inN1.value !== "") {
+        if (vN1 < 7 && vN1 > 0) {
+            inI1.disabled = false;
+            inI1.placeholder = "Ingrese intensif.";
+        } else {
+            inI1.disabled = true;
+            inI1.value = '';
+            vI1 = 0;
+        }
+    }
 
-    // Nota de cálculo para el promedio
-    let notaEfec1 = (vN1 >= 7) ? vN1 : vI1;
-    let notaEfec2 = (vN2 >= 7) ? vN2 : vI2;
+    if (inN2.value !== "") {
+        if (vN2 < 7 && vN2 > 0) {
+            inI2.disabled = false;
+            inI2.placeholder = "Ingrese intensif.";
+        } else {
+            inI2.disabled = true;
+            inI2.value = '';
+            vI2 = 0;
+        }
+    }
+
+    // Determinar si los cuatrimestres están aprobados
+    const aprobadoC1 = (vN1 >= 7) || (vI1 >= 4);
+    const aprobadoC2 = (vN2 >= 7) || (vI2 >= 4);
     
-    if (vN1 < 7 && inI1.value === "") notaEfec1 = vN1;
-    if (vN2 < 7 && inI2.value === "") notaEfec2 = vN2;
+    // Calcular nota efectiva de cada cuatrimestre
+    let notaEfectivaC1 = 0;
+    let notaEfectivaC2 = 0;
+    
+    if (aprobadoC1) {
+        notaEfectivaC1 = Math.max(vN1, vI1);
+    } else {
+        notaEfectivaC1 = Math.max(vN1, vI1);
+    }
+    
+    if (aprobadoC2) {
+        notaEfectivaC2 = Math.max(vN2, vI2);
+    } else {
+        notaEfectivaC2 = Math.max(vN2, vI2);
+    }
 
+    // Calcular promedio
     let promedio = 0;
-    let definitiva = "-";
-
     if (inN1.value !== "" && inN2.value !== "") {
-        let calculo = (notaEfec1 + notaEfec2) / 2;
-        promedio = parseFloat(calculo.toFixed(2));
-        if (spanProm) spanProm.innerText = promedio;
+        promedio = (notaEfectivaC1 + notaEfectivaC2) / 2;
+        promedio = Math.round(promedio * 10) / 10; // Redondear a 1 decimal
+    }
 
-        // REGLA CLAVE: Promedio >= 7 Y AMBOS APROBADOS
-        if (promedio >= 7 && aprobadoC1 && aprobadoC2) {
+    // LÓGICA DE DEFINITIVA
+    let definitiva = "-";
+    let estado = "Sin datos";
+    
+    if (inN1.value !== "" && inN2.value !== "") {
+        // CASO 1: Ambos cuatrimestres aprobados y Promedio ≥ 7
+        if (aprobadoC1 && aprobadoC2 && promedio >= 7) {
             definitiva = Math.round(promedio);
             if (definitiva < 7) definitiva = 7;
             inDic.disabled = true;
             inDic.value = '';
             inFeb.disabled = true;
             inFeb.value = '';
-        } else {
-            // DEBE IR A DICIEMBRE
+            estado = "Aprobado por promoción";
+        } 
+        // CASO 2: Va a Diciembre
+        else {
             inDic.disabled = false;
-            let vDic = parseFloat(inDic.value) || 0;
+            
             if (inDic.value !== "") {
+                // Si tiene nota de Diciembre
                 if (vDic >= 4) {
                     definitiva = vDic;
                     inFeb.disabled = true;
                     inFeb.value = '';
+                    estado = "Aprobado en Diciembre";
                 } else {
+                    // Va a Febrero
                     inFeb.disabled = false;
-                    let vFeb = parseFloat(inFeb.value) || 0;
                     if (inFeb.value !== "") {
-                        definitiva = vFeb >= 4 ? vFeb : "C.I.";
+                        if (vFeb >= 4) {
+                            definitiva = vFeb;
+                            estado = "Aprobado en Febrero";
+                        } else {
+                            definitiva = "C.I.";
+                            estado = "Recursa (C.I.)";
+                        }
+                    } else {
+                        estado = "En Diciembre";
                     }
                 }
             } else {
                 inFeb.disabled = true;
+                estado = "Regular";
             }
         }
     } else {
-        if (spanProm) spanProm.innerText = "-";
         inDic.disabled = true;
         inFeb.disabled = true;
+        estado = "Faltan notas";
     }
 
+    // Actualizar interfaz
+    if (spanProm) spanProm.innerText = promedio > 0 ? promedio.toFixed(1) : "-";
     if (spanDef) spanDef.innerText = definitiva;
+    if (spanEstado) spanEstado.innerText = estado;
+    
+    // Colores según estado
     if (tdDef) {
-        tdDef.className = "text-center fw-bold text-white def-cell " + 
-            (definitiva === "C.I." ? "bg-danger" : 
-             (definitiva !== "-" ? "bg-success" : "bg-secondary"));
+        if (definitiva === "C.I.") {
+            tdDef.className = "text-center fw-bold text-white def-cell bg-danger";
+        } else if (definitiva !== "-" && parseFloat(definitiva) >= 4) {
+            tdDef.className = "text-center fw-bold text-white def-cell bg-success";
+        } else if (definitiva !== "-") {
+            tdDef.className = "text-center fw-bold text-white def-cell bg-warning";
+        } else {
+            tdDef.className = "text-center fw-bold text-white def-cell bg-secondary";
+        }
     }
+    
+    return {
+        dni: dni,
+        n1: vN1,
+        i1: vI1,
+        n2: vN2,
+        i2: vI2,
+        prom: promedio,
+        dic: vDic,
+        feb: vFeb,
+        def: definitiva,
+        estado: estado,
+        aprobadoC1: aprobadoC1,
+        aprobadoC2: aprobadoC2
+    };
 }
 
 async function guardarNotasDocente() {
-    if (!window.cursoActualDocente) {
+    if (!cursoActualDocente) {
         alert('Error: No hay datos del curso actual');
         return;
     }
@@ -498,30 +595,15 @@ async function guardarNotasDocente() {
     const notasArray = [];
     
     rows.forEach(row => {
-        const dni = row.dataset.dni;
-        const n1 = row.querySelector('.n1').value;
-        const i1 = row.querySelector('.i1').value;
-        const n2 = row.querySelector('.n2').value;
-        const i2 = row.querySelector('.i2').value;
-        const dic = row.querySelector('.dic').value;
-        const feb = row.querySelector('.feb').value;
-        const def = row.querySelector('.definitiva').innerText;
-        
-        notasArray.push({
-            dni: dni,
-            n1_c1: n1,
-            i1: i1,
-            n1_c2: n2,
-            i2: i2,
-            dic: dic,
-            feb: feb,
-            def: def
-        });
+        const calculo = calcularFilaCompleta(row.dataset.dni);
+        if (calculo) {
+            notasArray.push(calculo);
+        }
     });
     
     const datos = {
         op: 'guardarNotasMasivo',
-        idMateria: window.cursoActualDocente.idMateria,
+        idMateria: cursoActualDocente.idMateria,
         notas: notasArray
     };
     
@@ -538,6 +620,12 @@ async function guardarNotasDocente() {
         
         if (json.status === 'success') {
             alert('✅ Calificaciones guardadas correctamente');
+            // Recargar para ver cambios
+            abrirCursoDocente(
+                cursoActualDocente.curso,
+                cursoActualDocente.idMateria,
+                cursoActualDocente.nombreMateria
+            );
         } else {
             throw new Error(json.message || 'Error al guardar');
         }
@@ -550,26 +638,81 @@ async function guardarNotasDocente() {
     }
 }
 
-// --- RESUMEN ---
+// --- RESUMEN MEJORADO ---
 
 function renderTabResumen(est) {
-    let aprobados = 0, diciembre = 0, febrero = 0, ci = 0;
-    let sumaAsis = 0;
-
-    est.forEach(e => {
+    // Contadores
+    let aprobados = 0, diciembre = 0, febrero = 0, ci = 0, regular = 0, promocionados = 0;
+    let sumaAsis = 0, sumaNotas = 0, contNotas = 0;
+    
+    // Análisis por estudiante
+    const detalleEstudiantes = est.map(e => {
         const porcAsis = e.asistencia && e.asistencia.porcentaje ? e.asistencia.porcentaje : 0;
+        const faltas = e.asistencia && e.asistencia.injustificadas ? e.asistencia.injustificadas : 0;
+        
+        let def = "-";
+        let estado = "Sin datos";
+        let notaNumerica = 0;
+        
+        if (e.notas && e.notas.nota_definitiva) {
+            def = e.notas.nota_definitiva;
+            if (def === "C.I.") {
+                estado = "C.I.";
+                ci++;
+            } else if (parseFloat(def) >= 4) {
+                estado = "Aprobado";
+                aprobados++;
+                notaNumerica = parseFloat(def);
+                sumaNotas += notaNumerica;
+                contNotas++;
+            }
+        } else if (e.notas) {
+            if (e.notas.diciembre && e.notas.diciembre !== "") {
+                estado = "En Diciembre";
+                diciembre++;
+            } else if (e.notas.febrero && e.notas.febrero !== "") {
+                estado = "En Febrero";
+                febrero++;
+            } else {
+                estado = "Regular";
+                regular++;
+            }
+        }
+        
+        // Verificar si es promocionado
+        const n1 = parseFloat(e.notas?.nota1_C1 || 0);
+        const n2 = parseFloat(e.notas?.nota1_C2 || 0);
+        const i1 = parseFloat(e.notas?.intensificacion1 || 0);
+        const i2 = parseFloat(e.notas?.intensificacion2 || 0);
+        
+        const aprobadoC1 = (n1 >= 7) || (i1 >= 4);
+        const aprobadoC2 = (n2 >= 7) || (i2 >= 4);
+        const prom = (Math.max(n1, i1) + Math.max(n2, i2)) / 2;
+        
+        if (aprobadoC1 && aprobadoC2 && prom >= 7 && estado === "Aprobado") {
+            estado = "Promocionado";
+            promocionados++;
+        }
+        
         sumaAsis += porcAsis;
         
-        const def = e.notas && e.notas.nota_definitiva ? e.notas.nota_definitiva : "-";
-        if (def === "C.I.") ci++;
-        else if (def !== "-" && parseFloat(def) >= 4) aprobados++;
-        
-        // Lógica simplificada para conteo de instancias
-        if (e.notas && e.notas.diciembre !== "" && def === "") diciembre++;
-        if (e.notas && e.notas.febrero !== "" && def === "") febrero++;
+        return {
+            nombre: e.nombre,
+            asistencia: porcAsis,
+            faltas: faltas,
+            definitiva: def,
+            estado: estado,
+            nota1: n1 || '-',
+            nota2: n2 || '-',
+            intens1: i1 || '-',
+            intens2: i2 || '-',
+            diciembre: e.notas?.diciembre || '-',
+            febrero: e.notas?.febrero || '-'
+        };
     });
-
+    
     const promedioAsis = est.length > 0 ? Math.round(sumaAsis / est.length) : 0;
+    const promedioNotas = contNotas > 0 ? (sumaNotas / contNotas).toFixed(1) : 0;
 
     return `
     <div class="row g-3 mb-4">
@@ -577,127 +720,31 @@ function renderTabResumen(est) {
             <div class="card bg-primary text-white text-center p-3 shadow-sm">
                 <small>Asistencia Promedio</small>
                 <h3 class="mb-0">${promedioAsis}%</h3>
+                <small class="opacity-75">${est.length} estudiantes</small>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card bg-success text-white text-center p-3 shadow-sm">
                 <small>Aprobados</small>
                 <h3 class="mb-0">${aprobados}</h3>
+                <small class="opacity-75">${promocionados} promocionados</small>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card bg-warning text-dark text-center p-3 shadow-sm">
                 <small>En Instancias</small>
                 <h3 class="mb-0">${diciembre + febrero}</h3>
+                <small class="opacity-75">${diciembre} Dic / ${febrero} Feb</small>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card bg-danger text-white text-center p-3 shadow-sm">
-                <small>Recursantes (C.I.)</small>
+                <small>Recursantes</small>
                 <h3 class="mb-0">${ci}</h3>
+                <small class="opacity-75">Prom. notas: ${promedioNotas}</small>
             </div>
         </div>
     </div>
-    <div class="table-responsive">
-        <table class="table table-bordered table-sm text-center">
-            <thead class="table-light">
-                <tr><th>Estudiante</th><th>% Asist.</th><th>Faltas</th><th>Definitiva</th></tr>
-            </thead>
-            <tbody>
-                ${est.map(e => {
-                    const porcAsis = e.asistencia && e.asistencia.porcentaje ? e.asistencia.porcentaje : 0;
-                    const faltas = e.asistencia && e.asistencia.injustificadas ? e.asistencia.injustificadas : 0;
-                    const def = e.notas && e.notas.nota_definitiva ? e.notas.nota_definitiva : '-';
-                    return `
-                    <tr>
-                        <td class="text-start">${e.nombre}</td>
-                        <td>${porcAsis}%</td>
-                        <td class="text-danger">${faltas}</td>
-                        <td class="fw-bold">${def}</td>
-                    </tr>`;
-                }).join('')}
-            </tbody>
-        </table>
-    </div>`;
-}
-
-// --- MIS DATOS ---
-
-async function verMisDatosDocente() {
-    try {
-        // Obtener datos del docente desde la hoja Docentes
-        const resp = await fetch(`${URL_API}?op=getDocentes&rol=Docente`);
-        const json = await resp.json();
-        
-        if (json.status !== 'success' || !json.data) {
-            throw new Error('No se pudieron cargar los datos');
-        }
-        
-        // Buscar al docente actual por DNI o email
-        const docente = json.data.find(d => 
-            String(d[0]) === String(usuarioActual.dni) || 
-            String(d[2]) === String(usuarioActual.email)
-        );
-        
-        if (!docente) {
-            throw new Error('No se encontraron tus datos');
-        }
-        
-        let html = `
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">👤 Mis Datos Personales</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold text-muted">DNI</label>
-                                <p class="form-control-plaintext">${docente[0] || 'No registrado'}</p>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold text-muted">Nombre Completo</label>
-                                <p class="form-control-plaintext">${docente[1] || 'No registrado'}</p>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold text-muted">Email ABC</label>
-                                <p class="form-control-plaintext">${docente[2] || 'No registrado'}</p>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold text-muted">Celular</label>
-                                <p class="form-control-plaintext">${docente[3] || 'No registrado'}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-4">
-                        <label class="form-label fw-bold text-muted">Materias Asignadas</label>
-                        <div class="border rounded p-3 bg-light">
-                            ${docente[4] ? docente[4].split(', ').map(m => 
-                                `<span class="badge bg-info text-dark me-2 mb-2">${m}</span>`
-                            ).join('') : '<span class="text-muted">No tienes materias asignadas</span>'}
-                        </div>
-                    </div>
-                    
-                    <div class="mt-4 text-center">
-                        <button class="btn btn-outline-secondary" onclick="iniciarModuloDocente()">
-                            ← Volver a mis cursos
-                        </button>
-                    </div>
-                </div>
-            </div>`;
-        
-        document.getElementById('contenido-dinamico').innerHTML = html;
-        
-    } catch (e) {
-        console.error('Error cargando datos del docente:', e);
-        document.getElementById('contenido-dinamico').innerHTML = `
-            <div class="alert alert-danger">
-                <h5>Error al cargar tus datos</h5>
-                <p>${e.message}</p>
-                <button class="btn btn-secondary mt-2" onclick="iniciarModuloDocente()">← Volver</button>
-            </div>`;
-    }
-}
+    
+    <div class="card mb-4">
+        <div class
