@@ -11,11 +11,9 @@ async function verDocentes() {
         const resp = await fetch(`${URL_API}?op=getDocentes&rol=Directivo`);
         const json = await resp.json();
         
-        if (json.status !== 'success') {
-            throw new Error(json.message || "Error desconocido al obtener docentes");
-        }
+        if (json.status !== 'success') throw new Error(json.message);
 
-        baseDatosDocentes = json.data; // Actualizamos variable global
+        baseDatosDocentes = json.data; 
 
         let html = `
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -27,9 +25,9 @@ async function verDocentes() {
                 <div class="card-body">
                     <div class="input-group">
                         <span class="input-group-text">🔍</span>
-                        <input type="text" class="form-control" id="buscadorDocentes" placeholder="Buscar por nombre, DNI o materia..." onkeyup="filtrarDocentes()">
+                        <input type="text" class="form-control" id="buscadorDocentes" placeholder="Buscar..." onkeyup="filtrarDocentes()">
                     </div>
-                    <div class="mt-2 text-muted small"><span id="contadorDocentes">${json.data.length} docentes registrados</span></div>
+                    <div class="mt-2 text-muted small"><span id="contadorDocentes">${json.data.length} docentes</span></div>
                 </div>
             </div>
             
@@ -41,47 +39,39 @@ async function verDocentes() {
                     <tbody id="tbodyDocentes">`;
         
         json.data.forEach((fila, index) => {
-            // Protección contra datos nulos
-            let dni = fila[0] || '';
-            let nombre = fila[1] || 'Sin Nombre';
-            let email = fila[2] || '';
-            let cel = fila[3] || '';
-            let materiasHTML = String(fila[4] || '');
-
-            // Formato visual de etiquetas
-            if(materiasHTML.includes('[SUPLANTADO]')) {
-                materiasHTML = materiasHTML.replace(/\[SUPLANTADO\]/g, '<span class="badge bg-danger me-1">[SUPLANTADO]</span>');
-            }
-            if(materiasHTML.includes('[Suplencia]')) {
-                // Regex segura para extraer a quién suple
-                materiasHTML = materiasHTML.replace(/\[Suplencia\].*?\(Suplente de: (.*?)\)/g, '<span class="badge bg-warning text-dark me-1" title="Suplente de: $1">[Suplente]</span>');
-            }
+            // Limpieza de datos
+            let materiasRaw = String(fila[4] || '');
             
+            // Renderizado visual simple y seguro para evitar el bug ">
+            // Simplemente reemplazamos los textos clave por Badges HTML
+            let materiasHTML = materiasRaw
+                .replace(/\[SUPLANTADO\]/g, '<span class="badge bg-danger">[SUPLANTADO]</span>')
+                .replace(/\[Titular\]/gi, '<span class="badge bg-success bg-opacity-75 text-white">Titular</span>')
+                .replace(/\[Provisional\]/gi, '<span class="badge bg-info text-dark">Prov.</span>')
+                .replace(/\[Interino\]/gi, '<span class="badge bg-secondary">Int.</span>')
+                .replace(/\[Suplencia\]/gi, '<span class="badge bg-warning text-dark">Supl.</span>');
+
             html += `
-                <tr class="fila-docente" data-dni="${dni}" data-nombre="${String(nombre).toLowerCase()}" data-materias="${String(materiasHTML).toLowerCase()}">
-                    <td>${dni}</td>
-                    <td class="fw-bold">${nombre}</td>
-                    <td><small>${email}<br>${cel}</small></td>
+                <tr class="fila-docente" data-dni="${fila[0]}" data-nombre="${String(fila[1]).toLowerCase()}" data-materias="${materiasRaw.toLowerCase()}">
+                    <td>${fila[0]}</td>
+                    <td class="fw-bold">${fila[1]}</td>
+                    <td><small>${fila[2]}<br>${fila[3] || ''}</small></td>
                     <td><small>${materiasHTML}</small></td>
                     <td class="text-center" style="width: 160px;">
                         <button class="btn btn-sm btn-outline-warning me-1" onclick="abrirModalAsignacion(${index})" title="Asignar Materia">📚</button>
                         <button class="btn btn-sm btn-outline-primary me-1" onclick="editarDocente(${index})" title="Editar">✏️</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="borrarDocente('${dni}', '${email}')" title="Borrar">🗑️</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="borrarDocente('${fila[0]}', '${fila[2]}')" title="Borrar">🗑️</button>
                     </td>
                 </tr>`;
         });
         
         html += `</tbody></table></div>`;
-        
-        // Agregamos los modales (Deben estar definidos en Templates.js)
-        html += renderModalDocenteHTML();
-        html += renderModalAsignacionCompletaHTML();
-        
+        html += renderModalDocenteHTML() + renderModalAsignacionCompletaHTML();
         contenedor.innerHTML = html;
         
     } catch (e) { 
-        console.error("Error en verDocentes:", e); 
-        contenedor.innerHTML = `<div class="alert alert-danger">Error cargando docentes: ${e.message}</div>`;
+        console.error(e);
+        contenedor.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
     }
 }
 
