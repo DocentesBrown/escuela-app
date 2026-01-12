@@ -433,3 +433,54 @@ function renderResumen(estudiantes) {
         <div class="col-md-4"><div class="card p-3 bg-info text-white"><h3>${promAsist}%</h3><p>Asistencia Promedio</p></div></div>
     </div>`;
 }
+
+async function verMisDatosDocente() {
+    const contenedor = document.getElementById('contenido-dinamico');
+    contenedor.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Cargando ficha...</p></div>`;
+
+    try {
+        const resp = await fetch(`${URL_API}?op=getMisDatos&rol=Docente&dni=${usuarioActual.dni}`);
+        const json = await resp.json();
+
+        if (json.status === 'success') {
+            const d = json.data;
+            contenedor.innerHTML = `
+            <div class="card shadow-sm mx-auto" style="max-width: 500px;">
+                <div class="card-header bg-primary text-white text-center">
+                    <h5 class="mb-0">👤 Mi Ficha Docente</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="text-muted small">Nombre Completo</label>
+                        <p class="fs-5 fw-bold">${d.nombre}</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted small">DNI</label>
+                        <p class="fs-5">${d.dni}</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted small">Email Registrado</label>
+                        <p class="fs-6">${d.email}</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted small">Celular / Contacto</label>
+                        <p class="fs-6">${d.celular || 'No registrado'}</p>
+                    </div>
+                    <hr>
+                    <div class="alert alert-warning d-flex align-items-center" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+                        <small>
+                            Esta información es la que figura en los registros de Dirección. 
+                            <strong>Si desea modificar algún dato, por favor comuníquese con el Equipo Directivo.</strong>
+                        </small>
+                    </div>
+                </div>
+            </div>`;
+        } else {
+            contenedor.innerHTML = `<div class="alert alert-danger">No se pudieron cargar los datos.</div>`;
+        }
+    } catch (e) {
+        console.error(e);
+        contenedor.innerHTML = `<div class="alert alert-danger">Error de conexión.</div>`;
+    }
+}
