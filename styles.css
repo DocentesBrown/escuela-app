@@ -598,3 +598,90 @@ body {
     border-bottom: 3px solid var(--color-primary);
     font-weight: 600;
 }
+
+/* ==========================================
+   BARRA DE NAVEGACIÓN MÓVIL MEJORADA
+   ========================================== */
+#navbar-mobile {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: var(--color-surface);
+    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.1);
+    display: flex !important; /* Forzar display flex */
+    justify-content: space-around;
+    padding: 12px 0 16px; /* Más padding abajo para notches */
+    z-index: 1050;
+    border-top: 1px solid var(--color-border);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+#navbar-mobile button {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 20%;
+    padding: 8px 0;
+    border-radius: var(--border-radius-md);
+    transition: all var(--transition-fast);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#navbar-mobile button:hover, 
+#navbar-mobile button.active {
+    color: var(--color-primary);
+    background-color: rgba(36, 73, 110, 0.05);
+}
+
+#navbar-mobile button.active {
+    font-weight: 600;
+}
+
+#navbar-mobile button span:first-child {
+    font-size: 22px;
+    margin-bottom: 2px;
+}
+
+/* Safe area para iPhone con notch */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    #navbar-mobile {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+}
+
+/* Efecto de botón presionado */
+#navbar-mobile button:active {
+    transform: scale(0.95);
+    background-color: rgba(36, 73, 110, 0.1);
+}
+
+/* Indicador de ítem activo */
+#navbar-mobile button.active::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    width: 20px;
+    height: 3px;
+    background-color: var(--color-primary);
+    border-radius: 2px;
+}
+
+/* Ajustar contenedor principal para la barra móvil */
+@media (max-width: 768px) {
+    .col-md-9 {
+        padding-bottom: 100px !important; /* Más espacio para la barra */
+    }
+    
+    /* Asegurar que los modales no queden detrás de la barra */
+    .modal {
+        z-index: 1060 !important;
+    }
+}
