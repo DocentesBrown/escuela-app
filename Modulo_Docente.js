@@ -420,7 +420,8 @@ function calcularLogicaFila(tr) {
                 inFeb.disabled = false;
                 const valFeb = getVal('feb');
                 if (valFeb !== null) {
-                    if (valFeb >= 4) { definitiva = valFeb; color = "bg-warning text-dark"; }
+                    if (valFeb >= 4) { 
+                        definitiva = valFeb; color = "bg-warning text-dark"; }
                     else { definitiva = "Desaprobado"; color = "bg-danger"; }
                 }
             }
