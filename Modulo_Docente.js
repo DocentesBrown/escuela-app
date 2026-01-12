@@ -445,86 +445,158 @@ function renderFilasNotas(estudiantes) {
 }
 
 function calcularLogicaFila(tr) {
+    // 1. HELPER: Obtener valor numérico seguro
     const getVal = (cls) => {
         let v = tr.querySelector('.' + cls).value;
-        return v === "" ? 0 : parseFloat(v);
+        return v === "" ? null : parseFloat(v); // Retorna null si está vacío para diferenciar de 0
     };
-    
-    // Elementos DOM
+    const hasVal = (cls) => tr.querySelector('.' + cls).value !== "";
+
+    // 2. ELEMENTOS DOM
+    const inN1 = tr.querySelector('.n1');
     const inI1 = tr.querySelector('.i1');
+    const inN2 = tr.querySelector('.n2');
     const inI2 = tr.querySelector('.i2');
+    
     const inDic = tr.querySelector('.dic');
     const inFeb = tr.querySelector('.feb');
+    
     const spProm = tr.querySelector('.promedio');
     const spDef = tr.querySelector('.definitiva');
 
+    // 3. OBTENER DATOS
     const n1 = getVal('n1');
-    const n2 = getVal('n2');
-
-    // 1. Habilitar Intensificaciones
-    if (n1 > 0 && n1 < 7) inI1.disabled = false; else { inI1.disabled = true; if(n1 >=7) inI1.value = ''; }
-    if (n2 > 0 && n2 < 7) inI2.disabled = false; else { inI2.disabled = true; if(n2 >=7) inI2.value = ''; }
-
-    // 2. Calcular Notas Finales de Cuatrimestre
     const i1 = getVal('i1');
+    const n2 = getVal('n2');
     const i2 = getVal('i2');
-    const final1 = (n1 < 7 && i1 > 0) ? i1 : n1; 
-    const final2 = (n2 < 7 && i2 > 0) ? i2 : n2;
 
-    // 3. Promedio
-    let promedio = 0;
-    if (n1 > 0 && n2 > 0) { 
-        promedio = (final1 + final2) / 2;
-        spProm.innerText = promedio; 
+    // =========================================================
+    // ETAPA 1: VALIDACIÓN DE INTENSIFICACIONES (Regla 1)
+    // =========================================================
+    
+    // Cuatrimestre 1
+    if (n1 !== null && n1 < 7) {
+        inI1.disabled = false; // Habilitar si < 7
     } else {
-        spProm.innerText = '-';
+        inI1.disabled = true; 
+        if (n1 !== null && n1 >= 7) inI1.value = ""; // Limpiar si aprobó la regular
     }
 
-    // 4. Definición de Estado
-    const aproboC1 = final1 >= 7;
-    const aproboC2 = final2 >= 7;
-    const promociona = promedio >= 7 && aproboC1 && aproboC2;
+    // Cuatrimestre 2
+    if (n2 !== null && n2 < 7) {
+        inI2.disabled = false; 
+    } else {
+        inI2.disabled = true; 
+        if (n2 !== null && n2 >= 7) inI2.value = ""; 
+    }
+
+    // =========================================================
+    // ETAPA 2: CÁLCULO DE APROBACIÓN POR CUATRIMESTRE
+    // =========================================================
+    
+    // Determinar nota efectiva C1 (Nota o Intensificación)
+    let notaEfec1 = 0;
+    let c1Aprobado = false;
+
+    if (n1 !== null && n1 >= 7) {
+        c1Aprobado = true;
+        notaEfec1 = n1;
+    } else if (i1 !== null && i1 >= 7) {
+        c1Aprobado = true;
+        notaEfec1 = i1; // Vale la intensificación si es >= 7
+    }
+
+    // Determinar nota efectiva C2
+    let notaEfec2 = 0;
+    let c2Aprobado = false;
+
+    if (n2 !== null && n2 >= 7) {
+        c2Aprobado = true;
+        notaEfec2 = n2;
+    } else if (i2 !== null && i2 >= 7) {
+        c2Aprobado = true;
+        notaEfec2 = i2;
+    }
+
+    // =========================================================
+    // ETAPA 3: DEFINICIÓN DE TRAYECTORIA (Reglas 2, 3 y 4)
+    // =========================================================
 
     let definitiva = "-";
     let color = "bg-secondary";
+    let promedio = "-";
 
-    if (promociona) {
+    // CASO A: PROMOCIONA (Ambos aprobados con >= 7)
+    if (c1Aprobado && c2Aprobado) {
+        let calcProm = (notaEfec1 + notaEfec2) / 2;
+        
+        // Mostrar promedio (puede tener decimales, ej: 7.50)
+        promedio = Number.isInteger(calcProm) ? calcProm : calcProm.toFixed(2);
+        
+        // La definitiva es el promedio
         definitiva = promedio;
-        color = "bg-success";
-        inDic.disabled = true; inDic.value = '';
-        inFeb.disabled = true; inFeb.value = '';
-    } else {
-        if (n1 > 0 && n2 > 0) {
-            inDic.disabled = false;
-            const notaDic = getVal('dic');
-            
-            if (notaDic >= 4) {
-                definitiva = notaDic;
-                color = "bg-warning text-dark";
-                inFeb.disabled = true; inFeb.value = '';
+        color = "bg-success"; // Verde
+
+        // Limpiar y bloquear instancias futuras
+        inDic.disabled = true; inDic.value = "";
+        inFeb.disabled = true; inFeb.value = "";
+    } 
+    // CASO B: NO PROMOCIONA (Va a Diciembre)
+    else {
+        // Promedio oculto (Regla 2)
+        promedio = "-"; 
+
+        // Habilitar Diciembre
+        inDic.disabled = false;
+        
+        // Logica Diciembre
+        const valDic = getVal('dic');
+
+        if (valDic !== null) {
+            if (valDic >= 4) {
+                // APROBÓ DICIEMBRE
+                definitiva = valDic;
+                color = "bg-warning text-dark"; // Amarillo (Aprobado en instancia)
+                
+                // Bloquear Febrero
+                inFeb.disabled = true; inFeb.value = "";
             } else {
-                if (tr.querySelector('.dic').value !== "") {
-                    inFeb.disabled = false;
-                    const notaFeb = getVal('feb');
-                    
-                    if (notaFeb >= 4) {
-                        definitiva = notaFeb;
+                // DESAPROBÓ DICIEMBRE -> Va a Febrero
+                definitiva = "C.I."; // Regla 3
+                color = "bg-danger"; // Rojo
+                
+                // Habilitar Febrero
+                inFeb.disabled = false;
+
+                // Logica Febrero
+                const valFeb = getVal('feb');
+                if (valFeb !== null) {
+                    if (valFeb >= 4) {
+                        // APROBÓ FEBRERO
+                        definitiva = valFeb;
                         color = "bg-warning text-dark";
-                    } else if (tr.querySelector('.feb').value !== "") {
-                        definitiva = "C.I."; 
+                    } else {
+                        // DESAPROBÓ FEBRERO
+                        definitiva = "Desaprobado"; // Regla 4
                         color = "bg-danger";
                     }
-                } else {
-                    inFeb.disabled = true;
                 }
             }
+        } else {
+            // Si Diciembre está vacío, Febrero está deshabilitado esperando a Dic.
+            inFeb.disabled = true; 
+            inFeb.value = "";
         }
     }
+
+    // =========================================================
+    // ETAPA 4: RENDERIZADO FINAL
+    // =========================================================
     
+    spProm.innerText = promedio;
     spDef.innerText = definitiva;
     spDef.className = `definitiva badge ${color}`;
 }
-
 async function guardarNotas() {
     const filas = document.querySelectorAll('.fila-notas');
     let paquete = [];
