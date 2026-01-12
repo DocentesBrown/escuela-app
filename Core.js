@@ -1,4 +1,3 @@
-
 // ============================================================================
 // ARCHIVO: Core.js
 // ============================================================================
@@ -11,28 +10,6 @@ let usuarioActual = null;
 let baseDatosAlumnos = []; 
 let baseDatosDocentes = []; 
 let baseDatosPreceptores = [];
-
-// ==========================================
-// FUNCIONES DE DETECCIÓN DE DISPOSITIVO
-// ==========================================
-
-// Detectar si es dispositivo móvil
-function esMovil() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-}
-
-// Función para actualizar el estado activo en la barra móvil
-function actualizarMenuActivoMobile(textoBoton) {
-    const botonesMobile = document.querySelectorAll('#navbar-mobile button');
-    botonesMobile.forEach(btn => {
-        btn.classList.remove('active');
-        // Buscar el botón cuyo texto coincide
-        const spanText = btn.querySelector('span:last-child');
-        if (spanText && spanText.textContent.toLowerCase().includes(textoBoton.toLowerCase())) {
-            btn.classList.add('active');
-        }
-    });
-}
 
 // ==========================================
 // LOGIN Y DASHBOARD
@@ -76,101 +53,54 @@ function cargarDashboard(usuario) {
 
     const rol = usuario.rol.toLowerCase();
     const menuLateral = document.getElementById('menu-lateral');
-    const menuMovil = document.getElementById('navbar-mobile');
+    const menuMovil = document.getElementById('navbar-mobile'); // NUEVO
     
-    // Limpiar ambos menús
     menuLateral.innerHTML = '';
-    menuMovil.innerHTML = '';
+    menuMovil.innerHTML = ''; // Limpiar móvil
 
     // --- FUNCIÓN HELPER PARA AGREGAR BOTONES ---
-    const agregarBoton = (texto, iconoBootstrap, onclick, activo = false) => {
+    const agregarBoton = (texto, icono, onclick, claseColor = '') => {
         // 1. Versión Escritorio (Lista)
-        const claseActivo = activo ? 'active' : '';
         menuLateral.innerHTML += `
-            <button class="list-group-item list-group-item-action ${claseActivo}" onclick="${onclick}">
-                <i class="bi ${iconoBootstrap} me-2"></i>${texto}
+            <button class="list-group-item list-group-item-action ${claseColor}" onclick="${onclick}">
+                ${texto}
             </button>`;
             
         // 2. Versión Móvil (Icono + Texto)
-        const claseActivoMovil = activo ? 'active' : '';
-        const textoCorto = texto.split(' ')[0];
+        // Usamos emojis como iconos si no tienes FontAwesome, o cámbialos por <i class="bi bi-..."></i>
         menuMovil.innerHTML += `
-            <button onclick="${onclick}" class="${claseActivoMovil}">
-                <span style="font-size:22px;"><i class="bi ${iconoBootstrap}"></i></span>
-                <span style="font-size:10px; margin-top:2px;">${textoCorto}</span>
-            </button>`;
+            <button onclick="${onclick}" class="${claseColor ? 'text-primary' : ''}">
+                <span style="font-size:20px;">${icono}</span>
+                <span>${texto.split(' ')[1] || texto}</span> </button>`;
     };
 
     // --- CONFIGURACIÓN DE MENÚS POR ROL ---
     
     if (rol === 'directivo') {
-        agregarBoton('Estudiantes', 'bi-people-fill', 'verEstudiantes(); actualizarMenuActivoMobile("Estudiantes")', true);
-        agregarBoton('Docentes', 'bi-person-badge-fill', 'verDocentes(); actualizarMenuActivoMobile("Docentes")');
-        agregarBoton('Preceptores', 'bi-clipboard-check-fill', 'verPreceptores(); actualizarMenuActivoMobile("Preceptores")');
-        
-        // Mostrar estudiantes por defecto
-        setTimeout(() => {
-            verEstudiantes();
-            actualizarMenuActivoMobile('Estudiantes');
-        }, 100);
+        agregarBoton('🎓 Estudiantes', '🎓', 'verEstudiantes()');
+        agregarBoton('👨‍🏫 Docentes', '👨‍🏫', 'verDocentes()');
+        agregarBoton('📋 Preceptores', '📋', 'verPreceptores()');
     }
     
     if (rol === 'preceptor') {
-        agregarBoton('Asistencia', 'bi-clipboard-data-fill', 'iniciarModuloPreceptor(); actualizarMenuActivoMobile("Asistencia")', true);
-        agregarBoton('Contactos', 'bi-telephone-fill', 'verContactosDocentes(); actualizarMenuActivoMobile("Contactos")');
-        
-        // Mostrar asistencia por defecto
-        setTimeout(() => {
-            iniciarModuloPreceptor();
-            actualizarMenuActivoMobile('Asistencia');
-        }, 100);
+        agregarBoton('📝 Asistencia', '📝', 'iniciarModuloPreceptor()', 'active');
+        agregarBoton('📞 Docentes', '📞', 'verContactosDocentes()');
     }
     
     if (rol === 'docente') {
-        agregarBoton('Cursos', 'bi-mortarboard-fill', 'iniciarModuloDocente(); actualizarMenuActivoMobile("Cursos")', true);
-        agregarBoton('Datos', 'bi-person-circle', 'verMisDatosDocente(); actualizarMenuActivoMobile("Datos")');
-        
-        // Mostrar cursos por defecto
-        setTimeout(() => {
-            iniciarModuloDocente();
-            actualizarMenuActivoMobile('Cursos');
-        }, 100);
+        agregarBoton('🏫 Cursos', '🏫', 'iniciarModuloDocente()', 'active');
+        agregarBoton('👤 Datos', '👤', 'verMisDatosDocente()');
     }
 
     // Botón Salir (Siempre al final)
-    menuLateral.innerHTML += `
-        <button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">
-            <i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión
-        </button>`;
-        
     menuMovil.innerHTML += `
         <button onclick="location.reload()" class="text-danger">
-            <span style="font-size:22px;"><i class="bi bi-box-arrow-right"></i></span>
-            <span style="font-size:10px; margin-top:2px;">Salir</span>
+            <span style="font-size:20px;">🚪</span>
+            <span>Salir</span>
         </button>`;
-    
-    // Asegurarnos de que la barra móvil se muestre (si es móvil)
-    if (esMovil()) {
-        menuMovil.classList.remove('d-none');
-        menuMovil.style.display = 'flex';
-    } else {
-        menuMovil.classList.add('d-none');
-    }
-    
-    // Actualizar el título de la sección
-    if (rol === 'directivo') {
-        document.getElementById('titulo-seccion').innerText = 'Gestión Directiva';
-    } else if (rol === 'preceptor') {
-        document.getElementById('titulo-seccion').innerText = 'Control de Asistencia';
-    } else if (rol === 'docente') {
-        document.getElementById('titulo-seccion').innerText = 'Panel Docente';
-    }
+        
+    menuLateral.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Cerrar Sesión</button>`;
 }
-
-// ==========================================
-// UTILIDADES
-// ==========================================
-
 function calcularEdad(fechaString) {
     if (!fechaString) return "-";
     const hoy = new Date();
@@ -180,35 +110,3 @@ function calcularEdad(fechaString) {
     if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) { edad--; }
     return isNaN(edad) ? "-" : edad + " años";
 }
-
-// ==========================================
-// MANEJO DE REDIMENSIONAMIENTO DE VENTANA
-// ==========================================
-
-window.addEventListener('resize', function() {
-    const menuMovil = document.getElementById('navbar-mobile');
-    if (menuMovil) {
-        if (esMovil()) {
-            menuMovil.classList.remove('d-none');
-            menuMovil.style.display = 'flex';
-        } else {
-            menuMovil.classList.add('d-none');
-            menuMovil.style.display = 'none';
-        }
-    }
-});
-
-// ==========================================
-// INICIALIZACIÓN
-// ==========================================
-
-// Verificar si hay usuario al cargar (para desarrollo)
-document.addEventListener('DOMContentLoaded', function() {
-    // Forzar la visualización correcta de la barra móvil si es necesario
-    if (esMovil()) {
-        const menuMovil = document.getElementById('navbar-mobile');
-        if (menuMovil) {
-            menuMovil.style.display = 'flex';
-        }
-    }
-});
