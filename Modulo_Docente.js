@@ -321,9 +321,13 @@ function cambiarFechaAsistencia(nuevaFecha) {
     cargarCursoDetalle(cursoActualData.materia.curso, idMateriaActual, nuevaFecha);
 }
 
-// EN ARCHIVO: Modulo_Docente.js
-
 async function guardarAsistencia() {
+    // 1. CONTROL DE SEGURIDAD
+    if (!usuarioActual || !usuarioActual.dni) {
+        alert("⚠️ Sesión expirada. Por favor cierra sesión y vuelve a entrar.");
+        return;
+    }
+    
     const btn = document.getElementById('btnGuardarAsis');
     const inputFecha = document.getElementById('fechaAsistencia');
 
