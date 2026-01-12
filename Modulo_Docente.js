@@ -453,16 +453,107 @@ async function guardarNotas() {
 }
 
 function renderResumen(estudiantes) {
-    if (!estudiantes || estudiantes.length === 0) return '<div class="alert alert-info">Sin datos.</div>';
-    let aprobados = 0, recursantes = 0, totalAsist = 0;
+    if (!estudiantes || estudiantes.length === 0) return '<div class="alert alert-info">Sin datos para mostrar.</div>';
+
+    // --- 1. CÁLCULOS ESTADÍSTICOS ---
+    let totalAlumnos = estudiantes.length;
+    let riesgoFaltas = 0;     // Asistencia < 75%
+    let contConNota = 0;      // Cantidad con nota numérica válida
+    let sumaNotas = 0;
+    
+    // Distribución de Notas
+    let dist = { 
+        bajos: 0,      // 1 a 3 (Desaprobados)
+        medios: 0,     // 4 a 6 (Aprobados)
+        altos: 0       // 7 a 10 (Destacados/Promoción)
+    };
+
     estudiantes.forEach(e => {
-        const def = e.notas && e.notas.def ? e.notas.def : '-';
-        if (!isNaN(parseFloat(def)) && parseFloat(def) >= 4) aprobados++;
-        if (def === 'C.I.' || def === 'Desaprobado') recursantes++;
-        totalAsist += (e.stats.porcentaje || 0);
+        // A. Cálculo de Riesgo de Faltas (< 75%)
+        let asis = e.stats.porcentaje !== undefined ? e.stats.porcentaje : 100;
+        if (asis < 75) riesgoFaltas++;
+
+        // B. Cálculo de Notas
+        // Intentamos leer la definitiva, asegurando formato numérico (punto o coma)
+        let defStr = e.notas && e.notas.def ? String(e.notas.def).replace(',', '.') : '';
+        let nota = parseFloat(defStr);
+
+        if (!isNaN(nota)) {
+            contConNota++;
+            sumaNotas += nota;
+
+            if (nota < 4) dist.bajos++;
+            else if (nota < 7) dist.medios++;
+            else dist.altos++;
+        }
     });
-    const promAsist = estudiantes.length ? Math.round(totalAsist / estudiantes.length) : 0;
-    return `<div class="row g-3 text-center"><div class="col-md-4"><div class="card p-3 bg-success text-white"><h3>${aprobados}</h3><p>Aprobados</p></div></div><div class="col-md-4"><div class="card p-3 bg-danger text-white"><h3>${recursantes}</h3><p>No Aprobados</p></div></div><div class="col-md-4"><div class="card p-3 bg-info text-white"><h3>${promAsist}%</h3><p>Asistencia</p></div></div></div>`;
+
+    let sinNota = totalAlumnos - contConNota;
+    let promedio = contConNota > 0 ? (sumaNotas / contConNota).toFixed(2) : '-';
+    let progresoCarga = Math.round((contConNota / totalAlumnos) * 100);
+
+    // Colores dinámicos
+    let colorRiesgo = riesgoFaltas > 0 ? 'danger' : 'success';
+    let colorCarga = progresoCarga === 100 ? 'success' : (progresoCarga > 50 ? 'primary' : 'warning');
+
+    // --- 2. GENERACIÓN DE HTML ---
+    return `
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <div class="row g-4 text-center">
+                
+                <div class="col-md-3 border-end">
+                    <h6 class="text-muted mb-3">Alertas</h6>
+                    
+                    <div class="mb-3">
+                        <h2 class="text-${colorRiesgo} fw-bold mb-0">${riesgoFaltas}</h2>
+                        <small class="text-muted">En Riesgo (Asist < 75%)</small>
+                    </div>
+
+                    <div>
+                        <h4 class="text-secondary fw-bold mb-0">${sinNota}</h4>
+                        <small class="text-muted">Alumnos sin Nota</small>
+                    </div>
+                </div>
+
+                <div class="col-md-5 border-end">
+                    <h6 class="text-muted mb-3">Rendimiento del Curso</h6>
+                    
+                    <div class="d-flex justify-content-center align-items-center mb-3">
+                        <div class="me-3">
+                            <span class="display-6 fw-bold text-dark">${promedio}</span>
+                            <div class="small text-muted">Promedio Gral.</div>
+                        </div>
+                    </div>
+
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar bg-danger" role="progressbar" style="width: ${(dist.bajos/contConNota)*100}%" title="Desaprobados (<4): ${dist.bajos}">${dist.bajos > 0 ? dist.bajos : ''}</div>
+                        <div class="progress-bar bg-warning text-dark" role="progressbar" style="width: ${(dist.medios/contConNota)*100}%" title="Aprobados (4-6): ${dist.medios}">${dist.medios > 0 ? dist.medios : ''}</div>
+                        <div class="progress-bar bg-success" role="progressbar" style="width: ${(dist.altos/contConNota)*100}%" title="Destacados (7-10): ${dist.altos}">${dist.altos > 0 ? dist.altos : ''}</div>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted mt-1">
+                        <span>Bajos</span><span>Medios</span><span>Altos</span>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <h6 class="text-muted mb-3">Estado de Carga</h6>
+                    
+                    <div class="position-relative d-inline-block mb-2">
+                        <h2 class="text-${colorCarga}">${progresoCarga}%</h2>
+                    </div>
+                    <div class="progress mb-2" style="height: 8px;">
+                        <div class="progress-bar bg-${colorCarga}" role="progressbar" style="width: ${progresoCarga}%"></div>
+                    </div>
+                    <p class="small text-muted mb-0">
+                        ${contConNota} de ${totalAlumnos} notas cerradas
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    `;
 }
 
 // --- 6. EVENT LISTENER EN VIVO (IMPORTANTE) ---
