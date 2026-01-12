@@ -149,28 +149,54 @@ function renderInterfazCurso(fechaSeleccionada) {
 // --- FUNCIONES ASISTENCIA ---
 
 function renderFilasAsistencia(estudiantes) {
-    if(!estudiantes.length) return '<tr><td colspan="4">No hay estudiantes.</td></tr>';
+    if(!estudiantes.length) return '<tr><td colspan="4" class="text-center py-3">No hay estudiantes en este curso.</td></tr>';
+    
     return estudiantes.map(e => {
         let estado = e.asistenciaDia.estado || ''; 
-        let isP = estado === 'P' ? 'checked' : '';
-        let isA = estado === 'A' ? 'checked' : '';
+        
+        // Lógica visual: Si está seleccionado es SÓLIDO, si no es BORDE (Outline)
+        let btnP = estado === 'P' ? 'btn-success' : 'btn-outline-success';
+        let btnA = estado === 'A' ? 'btn-danger' : 'btn-outline-danger';
+        let btnT = estado === 'T' ? 'btn-warning' : 'btn-outline-warning';
+
         let colorCond = e.condicion.toLowerCase().includes('recur') ? 'bg-warning text-dark' : 'bg-light text-secondary border';
 
         return `
         <tr data-dni="${e.dni}">
-            <td><div class="fw-bold">${e.nombre}</div><span class="badge ${colorCond} rounded-pill" style="font-size:0.7em">${e.condicion}</span></td>
-            <td class="text-center">
-                <div class="btn-group">
-                    <input type="radio" class="btn-check" name="asis_${e.dni}" id="P_${e.dni}" value="P" ${isP}><label class="btn btn-outline-success btn-sm" for="P_${e.dni}">P</label>
-                    <input type="radio" class="btn-check" name="asis_${e.dni}" id="A_${e.dni}" value="A" ${isA}><label class="btn btn-outline-danger btn-sm" for="A_${e.dni}">A</label>
+            <td class="align-middle">
+                <div class="fw-bold" style="font-size: 1rem;">${e.nombre}</div>
+                <span class="badge ${colorCond} rounded-pill">${e.condicion}</span>
+            </td>
+
+            <td class="align-middle">
+                <div class="d-flex gap-2" style="min-width: 160px;">
+                    
+                    <button type="button" class="btn ${btnP} flex-fill py-2 shadow-sm fw-bold" 
+                        onclick="seleccionarAsistencia(this, '${e.dni}', 'P')">
+                        P
+                    </button>
+                    
+                    <button type="button" class="btn ${btnA} flex-fill py-2 shadow-sm fw-bold" 
+                        onclick="seleccionarAsistencia(this, '${e.dni}', 'A')">
+                        A
+                    </button>
+                    
+                    <button type="button" class="btn ${btnT} flex-fill py-2 shadow-sm fw-bold" 
+                        onclick="seleccionarAsistencia(this, '${e.dni}', 'T')">
+                        T
+                    </button>
+
                 </div>
             </td>
-            <td class="text-center">
-                <span class="badge bg-primary">${e.stats.porcentaje}% Asist.</span><br>
-                <span class="text-danger small fw-bold">${e.stats.faltas} Injust.</span>
+
+            <td class="text-center align-middle d-none d-sm-table-cell"> <span class="badge bg-primary mb-1">${e.stats.porcentaje}%</span><br>
+                <span class="text-danger small fw-bold">${e.stats.faltas} F.</span>
             </td>
-            <td class="text-center">
-                <button class="btn btn-sm btn-outline-secondary" onclick="abrirModalJustificar('${e.dni}', '${e.nombre}')">📜 Justificar</button>
+
+            <td class="text-center align-middle">
+                <button class="btn btn-outline-secondary btn-sm py-2 px-3" onclick="abrirModalJustificar('${e.dni}', '${e.nombre}')">
+                   📜
+                </button>
             </td>
         </tr>`;
     }).join('');
@@ -483,4 +509,33 @@ async function verMisDatosDocente() {
         console.error(e);
         contenedor.innerHTML = `<div class="alert alert-danger">Error de conexión.</div>`;
     }
+}
+
+
+function seleccionarAsistencia(btn, dni, valor) {
+    // 1. Quitar colores activos de los hermanos (resetear fila)
+    const fila = btn.closest('td').querySelector('.d-flex');
+    const botones = fila.querySelectorAll('button');
+    
+    botones.forEach(b => {
+        // Volver todos a outline
+        if (b.classList.contains('btn-success')) b.classList.replace('btn-success', 'btn-outline-success');
+        if (b.classList.contains('btn-danger')) b.classList.replace('btn-danger', 'btn-outline-danger');
+        if (b.classList.contains('btn-warning')) b.classList.replace('btn-warning', 'btn-outline-warning');
+    });
+
+    // 2. Pintar el botón clickeado
+    if (valor === 'P') {
+        btn.classList.replace('btn-outline-success', 'btn-success');
+    } else if (valor === 'A') {
+        btn.classList.replace('btn-outline-danger', 'btn-danger');
+    } else if (valor === 'T') {
+        btn.classList.replace('btn-outline-warning', 'btn-warning');
+    }
+
+    // 3. (Opcional) Guardar en memoria temporal si tienes un objeto global
+    // if(cursoActualData) {
+    //    let alumno = cursoActualData.estudiantes.find(e => e.dni == dni);
+    //    if(alumno) alumno.asistenciaDia.estado = valor;
+    // }
 }
