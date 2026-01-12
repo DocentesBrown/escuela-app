@@ -19,19 +19,23 @@ async function iniciarModuloDocente() {
         }
         
         let html = `<h4 class="mb-4">🏫 Mis Cursos Asignados</h4><div class="row">`;
+        
         json.data.forEach(grupo => {
             grupo.materias.forEach(mat => {
+                // AQUÍ ESTÁ LA CLAVE: onclick="cargarVistaAsistencia('${mat.id}')"
                 html += `
                 <div class="col-md-4 mb-3">
-                    <div class="card shadow-sm border-start border-4 border-primary h-100">
-                        <div class="card-body">
+                    <div class="card shadow-sm border-start border-4 border-primary h-100 cursor-pointer" 
+                         onclick="cargarVistaAsistencia('${mat.id}')" style="cursor:pointer;">
+                        <div class="card-body hover-effect">
                             <h5 class="card-title text-primary fw-bold">${grupo.curso}</h5>
                             <h6 class="card-subtitle mb-2 text-dark">${mat.nombre}</h6>
-                            <p class="small text-muted mb-2">${mat.tipoAsignacion}</p>
-                            <span class="badge bg-info text-dark">👥 ${mat.cantidadEstudiantes || 0} Alumnos</span>
-                            <button onclick="cargarCursoDetalle('${grupo.curso}', '${mat.id}')" class="btn btn-outline-primary w-100 mt-3">
-                                Gestionar
-                            </button>
+                            <p class="small text-muted mb-0">
+                                <i class="bi bi-people"></i> ${mat.cantidadEstudiantes} Alumnos
+                            </p>
+                            <div class="mt-2 text-end">
+                                <span class="badge bg-light text-primary">Ingresar ➜</span>
+                            </div>
                         </div>
                     </div>
                 </div>`;
@@ -41,7 +45,8 @@ async function iniciarModuloDocente() {
         contenedor.innerHTML = html;
 
     } catch (e) {
-        contenedor.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
+        console.error(e);
+        contenedor.innerHTML = `<div class="alert alert-danger">Error de conexión.</div>`;
     }
 }
 
@@ -202,6 +207,68 @@ function renderFilasAsistencia(estudiantes) {
     }).join('');
 }
 
+async function cargarVistaAsistencia(idMateria) {
+    idMateriaActual = idMateria; // Variable Global
+    const contenedor = document.getElementById('contenido-dinamico');
+    contenedor.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Cargando planilla...</p></div>`;
+
+    try {
+        const resp = await fetch(`${URL_API}?op=getEstudiantesConDatosCompletos&rol=Docente&dni=${usuarioActual.dni}&idMateria=${idMateria}`);
+        const json = await resp.json();
+
+        if (json.status === 'success') {
+            cursoActualData = json.data; // Variable Global para guardar cambios
+            const materia = json.data.materia;
+            const hoy = new Date().toISOString().split('T')[0];
+
+            let html = `
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                    <button class="btn btn-outline-secondary btn-sm mb-1" onclick="iniciarModuloDocente()">← Volver</button>
+                    <h5 class="mb-0 text-primary">${materia.nombre} <small class="text-muted">(${materia.curso})</small></h5>
+                </div>
+                
+                <div class="d-flex gap-2 align-items-end">
+                    <div>
+                        <label class="small text-muted fw-bold">Fecha:</label>
+                        <input type="date" id="fechaAsistencia" class="form-control form-control-sm" value="${hoy}" onchange="recargarAsistenciaFecha(this.value)">
+                    </div>
+                    <div>
+                        <label class="d-block">&nbsp;</label>
+                        <button id="btnGuardarAsis" class="btn btn-primary btn-sm" onclick="guardarAsistencia()">
+                            💾 Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Estudiante</th>
+                                <th style="min-width:180px">Asistencia</th>
+                                <th class="text-center d-none d-sm-table-cell">Detalles</th>
+                                <th class="text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyAsistencia">
+                            ${renderFilasAsistencia(json.data.estudiantes)}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+
+            contenedor.innerHTML = html;
+        } else {
+            contenedor.innerHTML = `<div class="alert alert-danger">Error: ${json.message}</div>`;
+        }
+    } catch (e) {
+        contenedor.innerHTML = `<div class="alert alert-danger">Error de conexión.</div>`;
+    }
+}
+
 async function abrirModalJustificar(dni, nombre) {
     const modal = new bootstrap.Modal(document.getElementById('modalJustificarFalta'));
     document.getElementById('lblAlumnoJustificar').innerText = nombre;
@@ -258,28 +325,23 @@ function cambiarFechaAsistencia(nuevaFecha) {
 
 async function guardarAsistencia() {
     const btn = document.getElementById('btnGuardarAsis');
-    const fecha = document.getElementById('fechaAsistencia').value;
-    
-    if (!idMateriaActual || !cursoActualData) return;
+    const inputFecha = document.getElementById('fechaAsistencia');
 
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
-
-    // 1. RECOLECTAR DATOS (Desde la memoria global actualizada por los botones)
-    // Filtramos solo los que tienen algún estado (P, A, T)
-    const asistenciaPayload = cursoActualData.estudiantes
-        .filter(e => e.asistenciaDia && e.asistenciaDia.estado) 
-        .map(e => ({
-            dni: e.dni,
-            estado: e.asistenciaDia.estado
-        }));
-
-    if (asistenciaPayload.length === 0) {
-        alert("⚠️ No has marcado ninguna asistencia (P, A o T).");
-        btn.disabled = false;
-        btn.innerText = "💾 Guardar Asistencia";
+    if (!inputFecha || !idMateriaActual || !cursoActualData) {
+        alert("Error de datos. Recargue la página.");
         return;
     }
+
+    const fecha = inputFecha.value;
+    if (!fecha) { alert("Seleccione una fecha."); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = 'Guardando...';
+
+    // Tomamos los datos de la memoria (cursoActualData) que modificaste con los botones
+    const asistenciaPayload = cursoActualData.estudiantes
+        .filter(e => e.asistenciaDia && e.asistenciaDia.estado)
+        .map(e => ({ dni: e.dni, estado: e.asistenciaDia.estado }));
 
     const datos = {
         op: 'guardarAsistenciaDocente',
@@ -290,30 +352,22 @@ async function guardarAsistencia() {
     };
 
     try {
-        // 2. ENVIAR AL BACKEND
-        const resp = await fetch(URL_API, {
-            method: 'POST',
-            body: JSON.stringify(datos)
-        });
-        
+        const resp = await fetch(URL_API, { method: 'POST', body: JSON.stringify(datos) });
         const json = await resp.json();
-
+        
         if (json.status === 'success') {
-            alert("✅ Asistencia guardada correctamente.");
-            // Recargar para ver reflejado en estadísticas
-            cargarVistaAsistencia(idMateriaActual); 
+            alert("✅ Guardado correctamente");
+            cargarVistaAsistencia(idMateriaActual); // Recargamos para confirmar visualmente
         } else {
-            alert("❌ Error al guardar: " + json.message);
+            alert("❌ Error: " + json.message);
         }
     } catch (e) {
-        console.error(e);
-        alert("❌ Error de conexión al guardar.");
+        alert("❌ Error de conexión");
     } finally {
         btn.disabled = false;
-        btn.innerText = "💾 Guardar Asistencia";
+        btn.innerText = "💾 Guardar";
     }
 }
-
 // --- FUNCIONES NOTAS (RITE) ---
 
 function renderFilasNotas(estudiantes) {
