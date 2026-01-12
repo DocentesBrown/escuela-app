@@ -13,6 +13,28 @@ let baseDatosDocentes = [];
 let baseDatosPreceptores = [];
 
 // ==========================================
+// FUNCIONES DE DETECCIÓN DE DISPOSITIVO
+// ==========================================
+
+// Detectar si es dispositivo móvil
+function esMovil() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+}
+
+// Función para actualizar el estado activo en la barra móvil
+function actualizarMenuActivoMobile(textoBoton) {
+    const botonesMobile = document.querySelectorAll('#navbar-mobile button');
+    botonesMobile.forEach(btn => {
+        btn.classList.remove('active');
+        // Buscar el botón cuyo texto coincide
+        const spanText = btn.querySelector('span:last-child');
+        if (spanText && spanText.textContent.toLowerCase().includes(textoBoton.toLowerCase())) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// ==========================================
 // LOGIN Y DASHBOARD
 // ==========================================
 
@@ -61,48 +83,58 @@ function cargarDashboard(usuario) {
     menuMovil.innerHTML = '';
 
     // --- FUNCIÓN HELPER PARA AGREGAR BOTONES ---
-    const agregarBoton = (texto, icono, onclick, activo = false) => {
+    const agregarBoton = (texto, iconoBootstrap, onclick, activo = false) => {
         // 1. Versión Escritorio (Lista)
         const claseActivo = activo ? 'active' : '';
         menuLateral.innerHTML += `
             <button class="list-group-item list-group-item-action ${claseActivo}" onclick="${onclick}">
-                ${texto}
+                <i class="bi ${iconoBootstrap} me-2"></i>${texto}
             </button>`;
             
         // 2. Versión Móvil (Icono + Texto)
         const claseActivoMovil = activo ? 'active' : '';
+        const textoCorto = texto.split(' ')[0];
         menuMovil.innerHTML += `
             <button onclick="${onclick}" class="${claseActivoMovil}">
-                <span style="font-size:22px;">${icono}</span>
-                <span style="font-size:10px;">${texto.split(' ')[1] || texto}</span>
+                <span style="font-size:22px;"><i class="bi ${iconoBootstrap}"></i></span>
+                <span style="font-size:10px; margin-top:2px;">${textoCorto}</span>
             </button>`;
     };
 
     // --- CONFIGURACIÓN DE MENÚS POR ROL ---
     
     if (rol === 'directivo') {
-        agregarBoton('🎓 Estudiantes', '👥', 'verEstudiantes()', true);
-        agregarBoton('👨‍🏫 Docentes', '👨‍🏫', 'verDocentes()');
-        agregarBoton('📋 Preceptores', '📋', 'verPreceptores()');
+        agregarBoton('Estudiantes', 'bi-people-fill', 'verEstudiantes(); actualizarMenuActivoMobile("Estudiantes")', true);
+        agregarBoton('Docentes', 'bi-person-badge-fill', 'verDocentes(); actualizarMenuActivoMobile("Docentes")');
+        agregarBoton('Preceptores', 'bi-clipboard-check-fill', 'verPreceptores(); actualizarMenuActivoMobile("Preceptores")');
         
         // Mostrar estudiantes por defecto
-        setTimeout(() => verEstudiantes(), 100);
+        setTimeout(() => {
+            verEstudiantes();
+            actualizarMenuActivoMobile('Estudiantes');
+        }, 100);
     }
     
     if (rol === 'preceptor') {
-        agregarBoton('📝 Asistencia', '📝', 'iniciarModuloPreceptor()', true);
-        agregarBoton('📞 Docentes', '📞', 'verContactosDocentes()');
+        agregarBoton('Asistencia', 'bi-clipboard-data-fill', 'iniciarModuloPreceptor(); actualizarMenuActivoMobile("Asistencia")', true);
+        agregarBoton('Contactos', 'bi-telephone-fill', 'verContactosDocentes(); actualizarMenuActivoMobile("Contactos")');
         
         // Mostrar asistencia por defecto
-        setTimeout(() => iniciarModuloPreceptor(), 100);
+        setTimeout(() => {
+            iniciarModuloPreceptor();
+            actualizarMenuActivoMobile('Asistencia');
+        }, 100);
     }
     
     if (rol === 'docente') {
-        agregarBoton('🏫 Cursos', '🏫', 'iniciarModuloDocente()', true);
-        agregarBoton('👤 Datos', '👤', 'verMisDatosDocente()');
+        agregarBoton('Cursos', 'bi-mortarboard-fill', 'iniciarModuloDocente(); actualizarMenuActivoMobile("Cursos")', true);
+        agregarBoton('Datos', 'bi-person-circle', 'verMisDatosDocente(); actualizarMenuActivoMobile("Datos")');
         
         // Mostrar cursos por defecto
-        setTimeout(() => iniciarModuloDocente(), 100);
+        setTimeout(() => {
+            iniciarModuloDocente();
+            actualizarMenuActivoMobile('Cursos');
+        }, 100);
     }
 
     // Botón Salir (Siempre al final)
@@ -113,12 +145,17 @@ function cargarDashboard(usuario) {
         
     menuMovil.innerHTML += `
         <button onclick="location.reload()" class="text-danger">
-            <span style="font-size:22px;">🚪</span>
-            <span style="font-size:10px;">Salir</span>
+            <span style="font-size:22px;"><i class="bi bi-box-arrow-right"></i></span>
+            <span style="font-size:10px; margin-top:2px;">Salir</span>
         </button>`;
     
-    // Asegurarnos de que la barra móvil se muestre
-    menuMovil.classList.remove('d-none');
+    // Asegurarnos de que la barra móvil se muestre (si es móvil)
+    if (esMovil()) {
+        menuMovil.classList.remove('d-none');
+        menuMovil.style.display = 'flex';
+    } else {
+        menuMovil.classList.add('d-none');
+    }
     
     // Actualizar el título de la sección
     if (rol === 'directivo') {
@@ -130,6 +167,10 @@ function cargarDashboard(usuario) {
     }
 }
 
+// ==========================================
+// UTILIDADES
+// ==========================================
+
 function calcularEdad(fechaString) {
     if (!fechaString) return "-";
     const hoy = new Date();
@@ -140,22 +181,34 @@ function calcularEdad(fechaString) {
     return isNaN(edad) ? "-" : edad + " años";
 }
 
-// Función para detectar dispositivo móvil
-function esMovil() {
-    return window.innerWidth <= 768;
-}
+// ==========================================
+// MANEJO DE REDIMENSIONAMIENTO DE VENTANA
+// ==========================================
 
-// Redirigir automáticamente el primer menú al cargar en móvil
+window.addEventListener('resize', function() {
+    const menuMovil = document.getElementById('navbar-mobile');
+    if (menuMovil) {
+        if (esMovil()) {
+            menuMovil.classList.remove('d-none');
+            menuMovil.style.display = 'flex';
+        } else {
+            menuMovil.classList.add('d-none');
+            menuMovil.style.display = 'none';
+        }
+    }
+});
+
+// ==========================================
+// INICIALIZACIÓN
+// ==========================================
+
+// Verificar si hay usuario al cargar (para desarrollo)
 document.addEventListener('DOMContentLoaded', function() {
-    // Si estamos en móvil y ya hay un usuario logueado, ejecutar el primer menú
-    if (esMovil() && usuarioActual) {
-        const rol = usuarioActual.rol.toLowerCase();
-        if (rol === 'directivo') {
-            verEstudiantes();
-        } else if (rol === 'preceptor') {
-            iniciarModuloPreceptor();
-        } else if (rol === 'docente') {
-            iniciarModuloDocente();
+    // Forzar la visualización correcta de la barra móvil si es necesario
+    if (esMovil()) {
+        const menuMovil = document.getElementById('navbar-mobile');
+        if (menuMovil) {
+            menuMovil.style.display = 'flex';
         }
     }
 });
