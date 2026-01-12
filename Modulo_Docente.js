@@ -445,130 +445,116 @@ function renderFilasNotas(estudiantes) {
 }
 
 function calcularLogicaFila(tr) {
-    // 1. HELPER: Obtener valor numérico seguro
+    // 1. HELPER: Obtener valor numérico seguro (o null si está vacío)
     const getVal = (cls) => {
         let v = tr.querySelector('.' + cls).value;
-        return v === "" ? null : parseFloat(v); // Retorna null si está vacío para diferenciar de 0
+        return v === "" ? null : parseFloat(v);
     };
-    const hasVal = (cls) => tr.querySelector('.' + cls).value !== "";
-
-    // 2. ELEMENTOS DOM
-    const inN1 = tr.querySelector('.n1');
-    const inI1 = tr.querySelector('.i1');
-    const inN2 = tr.querySelector('.n2');
-    const inI2 = tr.querySelector('.i2');
     
+    // 2. ELEMENTOS DOM (Para poder bloquearlos/desbloquearlos)
+    const inI1 = tr.querySelector('.i1');
+    const inI2 = tr.querySelector('.i2');
     const inDic = tr.querySelector('.dic');
     const inFeb = tr.querySelector('.feb');
-    
     const spProm = tr.querySelector('.promedio');
     const spDef = tr.querySelector('.definitiva');
 
-    // 3. OBTENER DATOS
+    // 3. OBTENER VALORES ACTUALES
     const n1 = getVal('n1');
     const i1 = getVal('i1');
     const n2 = getVal('n2');
     const i2 = getVal('i2');
 
     // =========================================================
-    // ETAPA 1: VALIDACIÓN DE INTENSIFICACIONES (Regla 1)
+    // ETAPA 1: REACTIVIDAD DE INTENSIFICACIONES
     // =========================================================
     
-    // Cuatrimestre 1
+    // Si N1 es menor a 7 (y no está vacío), habilitamos Intensificación 1
     if (n1 !== null && n1 < 7) {
-        inI1.disabled = false; // Habilitar si < 7
+        inI1.disabled = false;
     } else {
-        inI1.disabled = true; 
-        if (n1 !== null && n1 >= 7) inI1.value = ""; // Limpiar si aprobó la regular
+        // Si N1 es >= 7 o vacío, bloqueamos y BORRAMOS Intensificación (Limpieza auto)
+        inI1.disabled = true;
+        inI1.value = ""; 
     }
 
-    // Cuatrimestre 2
+    // Si N2 es menor a 7, habilitamos Intensificación 2
     if (n2 !== null && n2 < 7) {
-        inI2.disabled = false; 
+        inI2.disabled = false;
     } else {
-        inI2.disabled = true; 
-        if (n2 !== null && n2 >= 7) inI2.value = ""; 
+        inI2.disabled = true;
+        inI2.value = "";
     }
 
     // =========================================================
-    // ETAPA 2: CÁLCULO DE APROBACIÓN POR CUATRIMESTRE
+    // ETAPA 2: APROBACIÓN POR CUATRIMESTRE
     // =========================================================
     
-    // Determinar nota efectiva C1 (Nota o Intensificación)
+    // Vemos valores frescos (porque acabamos de limpiar inputs si hacía falta)
+    const valI1 = getVal('i1');
+    const valI2 = getVal('i2');
+
+    // Nota efectiva C1: Si N1 es >=7 vale N1. Si no, si I1 >= 7 vale I1.
     let notaEfec1 = 0;
     let c1Aprobado = false;
 
-    if (n1 !== null && n1 >= 7) {
-        c1Aprobado = true;
-        notaEfec1 = n1;
-    } else if (i1 !== null && i1 >= 7) {
-        c1Aprobado = true;
-        notaEfec1 = i1; // Vale la intensificación si es >= 7
-    }
+    if (n1 !== null && n1 >= 7) { c1Aprobado = true; notaEfec1 = n1; }
+    else if (valI1 !== null && valI1 >= 7) { c1Aprobado = true; notaEfec1 = valI1; }
 
-    // Determinar nota efectiva C2
+    // Nota efectiva C2
     let notaEfec2 = 0;
     let c2Aprobado = false;
 
-    if (n2 !== null && n2 >= 7) {
-        c2Aprobado = true;
-        notaEfec2 = n2;
-    } else if (i2 !== null && i2 >= 7) {
-        c2Aprobado = true;
-        notaEfec2 = i2;
-    }
+    if (n2 !== null && n2 >= 7) { c2Aprobado = true; notaEfec2 = n2; }
+    else if (valI2 !== null && valI2 >= 7) { c2Aprobado = true; notaEfec2 = valI2; }
 
     // =========================================================
-    // ETAPA 3: DEFINICIÓN DE TRAYECTORIA (Reglas 2, 3 y 4)
+    // ETAPA 3: DEFINICIÓN DE TRAYECTORIA (Cascada)
     // =========================================================
 
     let definitiva = "-";
     let color = "bg-secondary";
     let promedio = "-";
 
-    // CASO A: PROMOCIONA (Ambos aprobados con >= 7)
+    // CASO A: PROMOCIONA (Todo en orden)
     if (c1Aprobado && c2Aprobado) {
         let calcProm = (notaEfec1 + notaEfec2) / 2;
-        
-        // Mostrar promedio (puede tener decimales, ej: 7.50)
+        // Si es entero (ej 8) mostramos 8, si es decimal (7.5) mostramos 7.50
         promedio = Number.isInteger(calcProm) ? calcProm : calcProm.toFixed(2);
         
-        // La definitiva es el promedio
         definitiva = promedio;
-        color = "bg-success"; // Verde
+        color = "bg-success"; 
 
-        // Limpiar y bloquear instancias futuras
+        // LIMPIEZA AUTOMÁTICA HACIA ABAJO
+        // Si promocionó, nos aseguramos que Diciembre y Febrero estén vacíos y cerrados
         inDic.disabled = true; inDic.value = "";
         inFeb.disabled = true; inFeb.value = "";
     } 
-    // CASO B: NO PROMOCIONA (Va a Diciembre)
+    // CASO B: NO PROMOCIONA (Falta aprobar algo)
     else {
-        // Promedio oculto (Regla 2)
-        promedio = "-"; 
-
-        // Habilitar Diciembre
+        promedio = "-"; // Se oculta promedio
+        
+        // Habilitamos Diciembre automáticamente
         inDic.disabled = false;
         
-        // Logica Diciembre
         const valDic = getVal('dic');
 
         if (valDic !== null) {
             if (valDic >= 4) {
                 // APROBÓ DICIEMBRE
                 definitiva = valDic;
-                color = "bg-warning text-dark"; // Amarillo (Aprobado en instancia)
+                color = "bg-warning text-dark"; 
                 
-                // Bloquear Febrero
+                // Limpieza automática de Febrero (ya no hace falta)
                 inFeb.disabled = true; inFeb.value = "";
             } else {
                 // DESAPROBÓ DICIEMBRE -> Va a Febrero
-                definitiva = "C.I."; // Regla 3
-                color = "bg-danger"; // Rojo
+                definitiva = "C.I."; 
+                color = "bg-danger"; 
                 
-                // Habilitar Febrero
+                // Habilitamos Febrero automáticamente
                 inFeb.disabled = false;
 
-                // Logica Febrero
                 const valFeb = getVal('feb');
                 if (valFeb !== null) {
                     if (valFeb >= 4) {
@@ -577,17 +563,26 @@ function calcularLogicaFila(tr) {
                         color = "bg-warning text-dark";
                     } else {
                         // DESAPROBÓ FEBRERO
-                        definitiva = "Desaprobado"; // Regla 4
+                        definitiva = "Desaprobado"; 
                         color = "bg-danger";
                     }
                 }
             }
         } else {
-            // Si Diciembre está vacío, Febrero está deshabilitado esperando a Dic.
+            // Si Diciembre está vacío, Febrero espera (se limpia y bloquea)
             inFeb.disabled = true; 
             inFeb.value = "";
         }
     }
+
+    // =========================================================
+    // ETAPA 4: PINTAR RESULTADOS
+    // =========================================================
+    spProm.innerText = promedio;
+    spDef.innerText = definitiva;
+    spDef.className = `definitiva badge ${color}`;
+}
+
 
     // =========================================================
     // ETAPA 4: RENDERIZADO FINAL
