@@ -46,39 +46,62 @@ async function iniciarSesion() {
     }
 }
 
-function cargarDashboard(user) {
+function cargarDashboard(usuario) {
     document.getElementById('login-screen').classList.add('d-none');
     document.getElementById('dashboard-screen').classList.remove('d-none');
-    document.getElementById('user-name').innerText = `${user.nombre} (${user.rol})`;
+    document.getElementById('user-name').innerText = usuario.nombre;
 
-    const menu = document.getElementById('menu-lateral');
-    menu.innerHTML = '';
-    const rol = String(user.rol).trim().toLowerCase(); 
+    const rol = usuario.rol.toLowerCase();
+    const menuLateral = document.getElementById('menu-lateral');
+    const menuMovil = document.getElementById('navbar-mobile'); // NUEVO
+    
+    menuLateral.innerHTML = '';
+    menuMovil.innerHTML = ''; // Limpiar móvil
 
+    // --- FUNCIÓN HELPER PARA AGREGAR BOTONES ---
+    const agregarBoton = (texto, icono, onclick, claseColor = '') => {
+        // 1. Versión Escritorio (Lista)
+        menuLateral.innerHTML += `
+            <button class="list-group-item list-group-item-action ${claseColor}" onclick="${onclick}">
+                ${texto}
+            </button>`;
+            
+        // 2. Versión Móvil (Icono + Texto)
+        // Usamos emojis como iconos si no tienes FontAwesome, o cámbialos por <i class="bi bi-..."></i>
+        menuMovil.innerHTML += `
+            <button onclick="${onclick}" class="${claseColor ? 'text-primary' : ''}">
+                <span style="font-size:20px;">${icono}</span>
+                <span>${texto.split(' ')[1] || texto}</span> </button>`;
+    };
+
+    // --- CONFIGURACIÓN DE MENÚS POR ROL ---
+    
     if (rol === 'directivo') {
-        menu.innerHTML += `
-            <button class="list-group-item list-group-item-action" onclick="verEstudiantes()">👥 Gestión Estudiantes</button>
-            <button class="list-group-item list-group-item-action" onclick="verDocentes()">🎓 Gestión Docentes</button>
-            <button class="list-group-item list-group-item-action" onclick="verPreceptores()">👨‍🏫 Gestión Preceptores</button>
-        `;
+        agregarBoton('📊 Panel', '📊', 'verEstudiantes()'); // Función que carga inicio
+        agregarBoton('🎓 Estudiantes', '🎓', 'verEstudiantes()');
+        agregarBoton('👨‍🏫 Docentes', '👨‍🏫', 'verDocentes()');
+        agregarBoton('📋 Preceptores', '📋', 'verPreceptores()');
     }
+    
     if (rol === 'preceptor') {
-        menu.innerHTML += `
-            <button class="list-group-item list-group-item-action" onclick="iniciarModuloPreceptor()">📝 Tomar Asistencia</button>
-            <button class="list-group-item list-group-item-action bg-info text-white" onclick="verContactosDocentes()">📞 Contactar Docentes</button>
-        `;
-        iniciarModuloPreceptor(); 
+        agregarBoton('📝 Asistencia', '📝', 'iniciarModuloPreceptor()', 'active');
+        agregarBoton('📞 Contactos', '📞', 'verContactosDocentes()');
     }
+    
     if (rol === 'docente') {
-        menu.innerHTML += `
-            <button class="list-group-item list-group-item-action bg-primary text-white" onclick="iniciarModuloDocente()">🏫 Mis Cursos</button>
-            <button class="list-group-item list-group-item-action" onclick="verMisDatosDocente()">👤 Mis Datos</button>
-        `;
-        iniciarModuloDocente();
+        agregarBoton('🏫 Cursos', '🏫', 'iniciarModuloDocente()', 'active');
+        agregarBoton('👤 Mis Datos', '👤', 'verMisDatosDocente()');
     }
-    menu.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Cerrar Sesión</button>`;
-}
 
+    // Botón Salir (Siempre al final)
+    menuMovil.innerHTML += `
+        <button onclick="location.reload()" class="text-danger">
+            <span style="font-size:20px;">🚪</span>
+            <span>Salir</span>
+        </button>`;
+        
+    menuLateral.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Cerrar Sesión</button>`;
+}
 function calcularEdad(fechaString) {
     if (!fechaString) return "-";
     const hoy = new Date();
