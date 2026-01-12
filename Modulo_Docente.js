@@ -644,13 +644,3 @@ function renderResumen(estudiantes) {
     </div>`;
 }
 
-// =========================================================
-// EVENTO "EN VIVO": DETECTA CADA TECLAJE
-// =========================================================
-document.addEventListener('input', function(e) {
-    // Si el elemento que tocaste tiene la clase 'inp-nota'...
-    if (e.target.classList.contains('inp-nota')) {
-        // ...calculamos la fila entera automáticamente
-        calcularLogicaFila(e.target.closest('tr'));
-    }
-});
