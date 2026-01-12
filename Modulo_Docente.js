@@ -254,33 +254,64 @@ function cambiarFechaAsistencia(nuevaFecha) {
     cargarCursoDetalle(cursoActualData.materia.curso, idMateriaActual, nuevaFecha);
 }
 
-async function guardarAsistencia() {
-    const fecha = document.getElementById('fechaAsistencia').value;
-    const filas = document.querySelectorAll('#tbody-asistencia tr');
-    let datosAsistencia = [];
+// EN ARCHIVO: Modulo_Docente.js
 
-    filas.forEach(tr => {
-        const dni = tr.getAttribute('data-dni');
-        const checked = tr.querySelector(`input[name="asis_${dni}"]:checked`);
-        // Si no está chequeado nada, no enviamos nada (o podríamos enviar vacío para borrar)
-        if (checked) {
-            datosAsistencia.push({ dni: dni, estado: checked.value });
-        }
-    });
+async function guardarAsistencia() {
+    const btn = document.getElementById('btnGuardarAsis');
+    const fecha = document.getElementById('fechaAsistencia').value;
+    
+    if (!idMateriaActual || !cursoActualData) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
+
+    // 1. RECOLECTAR DATOS (Desde la memoria global actualizada por los botones)
+    // Filtramos solo los que tienen algún estado (P, A, T)
+    const asistenciaPayload = cursoActualData.estudiantes
+        .filter(e => e.asistenciaDia && e.asistenciaDia.estado) 
+        .map(e => ({
+            dni: e.dni,
+            estado: e.asistenciaDia.estado
+        }));
+
+    if (asistenciaPayload.length === 0) {
+        alert("⚠️ No has marcado ninguna asistencia (P, A o T).");
+        btn.disabled = false;
+        btn.innerText = "💾 Guardar Asistencia";
+        return;
+    }
+
+    const datos = {
+        op: 'guardarAsistenciaDocente',
+        dniDocente: usuarioActual.dni,
+        idMateria: idMateriaActual,
+        fecha: fecha,
+        asistencia: asistenciaPayload
+    };
 
     try {
-        const resp = await fetch(URL_API, { 
-            method: 'POST', 
-            body: JSON.stringify({
-                op: 'guardarAsistenciaDocente',
-                idMateria: idMateriaActual,
-                dniDocente: usuarioActual.dni,
-                fecha: fecha,
-                asistencia: datosAsistencia
-            })
+        // 2. ENVIAR AL BACKEND
+        const resp = await fetch(URL_API, {
+            method: 'POST',
+            body: JSON.stringify(datos)
         });
-        alert("Asistencia guardada.");
-    } catch(e) { alert("Error al guardar."); }
+        
+        const json = await resp.json();
+
+        if (json.status === 'success') {
+            alert("✅ Asistencia guardada correctamente.");
+            // Recargar para ver reflejado en estadísticas
+            cargarVistaAsistencia(idMateriaActual); 
+        } else {
+            alert("❌ Error al guardar: " + json.message);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("❌ Error de conexión al guardar.");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "💾 Guardar Asistencia";
+    }
 }
 
 // --- FUNCIONES NOTAS (RITE) ---
