@@ -1,5 +1,5 @@
 // ============================================================================
-// ARCHIVO: Modulo_Docente.js (VERSIÓN FINAL INTEGRADA)
+// ARCHIVO: Modulo_Docente.js (VERSIÓN DEFINITIVA - CORREGIDA Y COMPLETA)
 // ============================================================================
 
 let cursoActualData = null; 
@@ -23,7 +23,6 @@ async function iniciarModuloDocente() {
         
         json.data.forEach(grupo => {
             grupo.materias.forEach(mat => {
-                // LLAMADA CORREGIDA: Usa el ID único triturado (ej: 'matematica2do1ra')
                 html += `
                 <div class="col-md-4 mb-3">
                     <div class="card shadow-sm border-start border-4 border-primary h-100 cursor-pointer" 
@@ -32,7 +31,7 @@ async function iniciarModuloDocente() {
                             <h5 class="card-title text-primary fw-bold">${grupo.curso}</h5>
                             <h6 class="card-subtitle mb-2 text-dark">${mat.nombre}</h6>
                             <p class="small text-muted mb-0">
-                                <i class="bi bi-people"></i> ${mat.cantidadEstudiantes || mat.totalEstudiantes || 0} Alumnos
+                                <i class="bi bi-people"></i> ${mat.cantidadEstudiantes || 0} Alumnos
                             </p>
                             <div class="mt-2 text-end">
                                 <span class="badge bg-light text-primary">Ingresar ➜</span>
@@ -51,7 +50,7 @@ async function iniciarModuloDocente() {
     }
 }
 
-// --- 2. VISTA DETALLADA DEL CURSO (ASISTENCIA, NOTAS, RESUMEN) ---
+// --- 2. VISTA DETALLADA DEL CURSO ---
 async function cargarVistaAsistencia(idMateria, fecha = null) {
     idMateriaActual = idMateria; 
     const contenedor = document.getElementById('contenido-dinamico');
@@ -60,17 +59,15 @@ async function cargarVistaAsistencia(idMateria, fecha = null) {
     const fechaQuery = fecha || new Date().toISOString().split('T')[0];
 
     try {
-        // Pedimos datos completos (Materia + Alumnos + Asistencia del día)
         const url = `${URL_API}?op=getEstudiantesConDatosCompletos&rol=Docente&dni=${usuarioActual.dni}&idMateria=${idMateria}&fecha=${fechaQuery}`;
         const resp = await fetch(url);
         const json = await resp.json();
         
         if (json.status !== 'success') throw new Error(json.message);
         
-        cursoActualData = json.data; // GUARDAMOS EN MEMORIA GLOBAL
+        cursoActualData = json.data; 
         const d = cursoActualData;
 
-        // Inyectar Modal Justificar (si no existe)
         injectarModalJustificar();
 
         let html = `
@@ -104,12 +101,7 @@ async function cargarVistaAsistencia(idMateria, fecha = null) {
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
-                            <tr>
-                                <th>Estudiante</th>
-                                <th style="min-width:180px">Asistencia</th>
-                                <th class="text-center d-none d-sm-table-cell">Stats</th>
-                                <th class="text-center">Acción</th>
-                            </tr>
+                            <tr><th>Estudiante</th><th style="min-width:180px">Asistencia</th><th class="text-center d-none d-sm-table-cell">Stats</th><th class="text-center">Acción</th></tr>
                         </thead>
                         <tbody id="tbody-asistencia">${renderFilasAsistencia(d.estudiantes)}</tbody>
                     </table>
@@ -145,7 +137,7 @@ async function cargarVistaAsistencia(idMateria, fecha = null) {
     }
 }
 
-// --- 3. FUNCIONES DE ASISTENCIA (LÓGICA GRANDE / TOUCH) ---
+// --- 3. FUNCIONES DE ASISTENCIA ---
 
 function renderFilasAsistencia(estudiantes) {
     if(!estudiantes || !estudiantes.length) return '<tr><td colspan="4" class="text-center py-3">No hay estudiantes.</td></tr>';
@@ -165,37 +157,28 @@ function renderFilasAsistencia(estudiantes) {
                 <div class="fw-bold" style="font-size: 1rem;">${e.nombre}</div>
                 <span class="badge ${colorCond} rounded-pill">${e.condicion}</span>
             </td>
-
             <td class="align-middle">
                 <div class="d-flex gap-2" style="min-width: 160px;">
                     <button type="button" class="btn ${btnP} flex-fill py-2 shadow-sm fw-bold" 
                         onclick="seleccionarAsistencia(this, '${e.dni}', 'P')">P</button>
-                    
                     <button type="button" class="btn ${btnA} flex-fill py-2 shadow-sm fw-bold" 
                         onclick="seleccionarAsistencia(this, '${e.dni}', 'A')">A</button>
-                    
                     <button type="button" class="btn ${btnT} flex-fill py-2 shadow-sm fw-bold" 
                         onclick="seleccionarAsistencia(this, '${e.dni}', 'T')">T</button>
                 </div>
             </td>
-
             <td class="text-center align-middle d-none d-sm-table-cell">
                 <span class="badge bg-primary mb-1">${e.stats.porcentaje || 0}%</span><br>
                 <span class="text-danger small fw-bold">${parseFloat(e.stats.faltas || 0)} F.</span>
             </td>
-
             <td class="text-center align-middle">
-                <button class="btn btn-outline-secondary btn-sm py-2 px-3" onclick="abrirModalJustificar('${e.dni}', '${e.nombre}')">
-                   📜
-                </button>
+                <button class="btn btn-outline-secondary btn-sm py-2 px-3" onclick="abrirModalJustificar('${e.dni}', '${e.nombre}')">📜</button>
             </td>
         </tr>`;
     }).join('');
 }
 
-
 function seleccionarAsistencia(btn, dni, valor) {
-    // 1. Reset visual de los hermanos
     const fila = btn.closest('td').querySelector('.d-flex');
     const botones = fila.querySelectorAll('button');
     
@@ -205,12 +188,10 @@ function seleccionarAsistencia(btn, dni, valor) {
         if (b.classList.contains('btn-warning')) b.classList.replace('btn-warning', 'btn-outline-warning');
     });
 
-    // 2. Pintar activo el seleccionado
     if (valor === 'P') btn.classList.replace('btn-outline-success', 'btn-success');
     else if (valor === 'A') btn.classList.replace('btn-outline-danger', 'btn-danger');
     else if (valor === 'T') btn.classList.replace('btn-outline-warning', 'btn-warning');
 
-    // 3. ACTUALIZAR MEMORIA (CRUCIAL PARA GUARDAR)
     if (cursoActualData && cursoActualData.estudiantes) {
         let alumno = cursoActualData.estudiantes.find(e => String(e.dni) === String(dni));
         if (alumno) {
@@ -221,66 +202,50 @@ function seleccionarAsistencia(btn, dni, valor) {
 }
 
 async function guardarAsistencia() {
-    // Seguridad
     if (!usuarioActual || !usuarioActual.dni) { alert("⚠️ Sesión expirada."); return; }
-    
     const btn = document.getElementById('btnGuardarAsis');
     const inputFecha = document.getElementById('fechaAsistencia');
 
-    if (!inputFecha || !idMateriaActual || !cursoActualData) {
-        alert("Error de datos. Recargue la página."); return;
-    }
+    if (!inputFecha || !idMateriaActual || !cursoActualData) { alert("Error de datos."); return; }
+    if (!inputFecha.value) { alert("Seleccione una fecha."); return; }
 
-    const fecha = inputFecha.value;
-    if (!fecha) { alert("Seleccione una fecha."); return; }
-
-    // Bloqueo botón
     btn.disabled = true;
     const textoOriginal = btn.innerHTML;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
 
-    // 1. RECOLECTAR DATOS DE MEMORIA
     const asistenciaPayload = cursoActualData.estudiantes
         .filter(e => e.asistenciaDia && e.asistenciaDia.estado)
         .map(e => ({ dni: e.dni, estado: e.asistenciaDia.estado }));
 
-    // 2. ADVERTENCIA SI ESTÁ VACÍO
     if (asistenciaPayload.length === 0) {
-        if(!confirm("⚠️ No has marcado ninguna asistencia (P, A o T).\nSi guardas ahora, borrarás lo que haya en este día.\n¿Continuar?")) {
-            btn.disabled = false;
-            btn.innerHTML = textoOriginal;
-            return;
+        if(!confirm("⚠️ No hay asistencias. Se borrarán los datos de este día. ¿Continuar?")) {
+            btn.disabled = false; btn.innerHTML = textoOriginal; return;
         }
     }
-
-    const datos = {
-        op: 'guardarAsistenciaDocente',
-        dniDocente: usuarioActual.dni,
-        idMateria: idMateriaActual,
-        fecha: fecha,
-        asistencia: asistenciaPayload
-    };
 
     try {
-        const resp = await fetch(URL_API, { method: 'POST', body: JSON.stringify(datos) });
+        const resp = await fetch(URL_API, { 
+            method: 'POST', 
+            body: JSON.stringify({
+                op: 'guardarAsistenciaDocente',
+                dniDocente: usuarioActual.dni,
+                idMateria: idMateriaActual,
+                fecha: inputFecha.value,
+                asistencia: asistenciaPayload
+            }) 
+        });
         const json = await resp.json();
-        
         if (json.status === 'success') {
-            alert("✅ Asistencia guardada correctamente.");
-            cargarVistaAsistencia(idMateriaActual, fecha); // Recargar para actualizar stats
+            alert("✅ Asistencia guardada.");
+            cargarVistaAsistencia(idMateriaActual, inputFecha.value);
         } else {
             alert("❌ Error: " + json.message);
-            btn.disabled = false;
-            btn.innerHTML = textoOriginal;
         }
-    } catch (e) {
-        alert("❌ Error de conexión");
-        btn.disabled = false;
-        btn.innerHTML = textoOriginal;
-    }
+    } catch (e) { alert("❌ Error de conexión"); } 
+    finally { btn.disabled = false; btn.innerHTML = textoOriginal; }
 }
 
-// --- 4. JUSTIFICACIÓN DE FALTAS ---
+// --- 4. JUSTIFICAR Y DATOS DOCENTE ---
 
 function injectarModalJustificar() {
     if (!document.getElementById('modalJustificarFalta')) {
@@ -318,29 +283,16 @@ async function abrirModalJustificar(dni, nombre) {
             container.innerHTML = '<div class="alert alert-success">No hay inasistencias para justificar.</div>';
         } else {
             json.data.forEach(f => {
-                // LÓGICA VISUAL: Si ya está justificado ('Si'), mostramos badge verde. Si no, botón amarillo.
-                let accionHtml = '';
-                
-                if (f.justificado === 'Si') {
-                    accionHtml = `<span class="badge bg-success border border-success p-2">
-                                    <i class="bi bi-check-circle-fill"></i> Justificada
-                                  </span>`;
-                } else {
-                    accionHtml = `<button class="btn btn-sm btn-warning shadow-sm" onclick="justificarAccion('${dni}', '${f.fechaIso}', this)">
-                                    Justificar
-                                  </button>`;
-                }
-                
-                // Muestra si es Ausente (A) o Tarde (T)
                 let badgeTipo = f.estado === 'T' ? 'bg-warning text-dark' : 'bg-danger';
                 let etiqueta = f.estado === 'T' ? 'Tardanza' : 'Ausente';
-
+                
+                let accionHtml = f.justificado === 'Si' 
+                    ? `<span class="badge bg-success border border-success p-2"><i class="bi bi-check-circle-fill"></i> Justificada</span>` 
+                    : `<button class="btn btn-sm btn-warning shadow-sm" onclick="justificarAccion('${dni}', '${f.fechaIso}', this)">Justificar</button>`;
+                
                 container.innerHTML += `
                 <div class="list-group-item d-flex justify-content-between align-items-center mb-2 shadow-sm border rounded">
-                    <div>
-                        <span class="fw-bold">${f.fecha}</span> 
-                        <span class="badge ${badgeTipo} ms-2">${etiqueta}</span>
-                    </div>
+                    <div><span class="fw-bold">${f.fecha}</span> <span class="badge ${badgeTipo} ms-2">${etiqueta}</span></div>
                     ${accionHtml}
                 </div>`;
             });
@@ -355,18 +307,14 @@ async function justificarAccion(dni, fechaIso, btn) {
         const resp = await fetch(URL_API, { method: 'POST', body: JSON.stringify({op: 'justificarFaltaDocente', dni, idMateria: idMateriaActual, fechaIso}) });
         const json = await resp.json();
         if(json.status === 'success') {
-            btn.parentElement.innerHTML = `<span class="badge bg-success">Justificada</span>`;
-            // Recargamos vista
-            const fechaActualInput = document.getElementById('fechaAsistencia').value;
-            cargarVistaAsistencia(idMateriaActual, fechaActualInput);
+            btn.parentElement.innerHTML = `<span class="badge bg-success border border-success p-2"><i class="bi bi-check-circle-fill"></i> Justificada</span>`;
+            cargarVistaAsistencia(idMateriaActual, document.getElementById('fechaAsistencia').value);
         } else {
             alert("Error: " + json.message);
             btn.disabled = false;
         }
     } catch(e) { alert("Error de conexión"); }
 }
-
-// --- 5. FICHA DE "MIS DATOS" (CON ALERTA) ---
 
 async function verMisDatosDocente() {
     const contenedor = document.getElementById('contenido-dinamico');
@@ -380,62 +328,31 @@ async function verMisDatosDocente() {
             const d = json.data;
             contenedor.innerHTML = `
             <div class="card shadow-sm mx-auto" style="max-width: 500px;">
-                <div class="card-header bg-primary text-white text-center">
-                    <h5 class="mb-0">👤 Mi Ficha Docente</h5>
-                </div>
+                <div class="card-header bg-primary text-white text-center"><h5 class="mb-0">👤 Mi Ficha Docente</h5></div>
                 <div class="card-body">
-                    <div class="mb-3">
-                        <label class="text-muted small">Nombre Completo</label>
-                        <p class="fs-5 fw-bold">${d.nombre}</p>
-                    </div>
-                    <div class="mb-3">
-                        <label class="text-muted small">DNI</label>
-                        <p class="fs-5">${d.dni}</p>
-                    </div>
-                    <div class="mb-3">
-                        <label class="text-muted small">Email Registrado</label>
-                        <p class="fs-6">${d.email}</p>
-                    </div>
-                    <div class="mb-3">
-                        <label class="text-muted small">Celular / Contacto</label>
-                        <p class="fs-6">${d.celular || 'No registrado'}</p>
-                    </div>
+                    <div class="mb-3"><label class="text-muted small">Nombre Completo</label><p class="fs-5 fw-bold">${d.nombre}</p></div>
+                    <div class="mb-3"><label class="text-muted small">DNI</label><p class="fs-5">${d.dni}</p></div>
+                    <div class="mb-3"><label class="text-muted small">Email</label><p class="fs-6">${d.email}</p></div>
                     <hr>
-                    <div class="alert alert-warning d-flex align-items-center" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
-                        <small>
-                            Esta información es la que figura en los registros de Dirección. 
-                            <strong>Si desea modificar algún dato, por favor comuníquese con el Equipo Directivo.</strong>
-                        </small>
-                    </div>
+                    <div class="alert alert-warning d-flex align-items-center"><i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i><small>Para cambios, comuníquese con el Equipo Directivo.</small></div>
                 </div>
             </div>`;
-        } else {
-            contenedor.innerHTML = `<div class="alert alert-danger">No se pudieron cargar los datos.</div>`;
-        }
-    } catch (e) {
-        console.error(e);
-        contenedor.innerHTML = `<div class="alert alert-danger">Error de conexión.</div>`;
-    }
+        } else { contenedor.innerHTML = `<div class="alert alert-danger">Error al cargar datos.</div>`; }
+    } catch (e) { contenedor.innerHTML = `<div class="alert alert-danger">Error de conexión.</div>`; }
 }
 
-// --- 6. FUNCIONES NOTAS (LÓGICA RITE INTACTA) ---
+// --- 5. FUNCIONES NOTAS (LÓGICA RITE REACTIVA) ---
 
 function renderFilasNotas(estudiantes) {
     return estudiantes.map(e => {
-        // Nos aseguramos que n sea un objeto, si falla el backend usamos vacío
         const n = e.notas || { n1:'', i1:'', n2:'', i2:'', dic:'', feb:'', def:'' };
-        
         return `
         <tr class="fila-notas" data-dni="${e.dni}">
             <td class="text-start ps-2 fw-bold text-truncate" style="max-width: 150px;">${e.nombre}</td>
-            
             <td><input type="number" class="form-control form-control-sm inp-nota n1" value="${n.n1 || ''}" min="1" max="10"></td>
             <td><input type="number" class="form-control form-control-sm inp-nota i1" value="${n.i1 || ''}" min="1" max="10" disabled></td>
-            
             <td><input type="number" class="form-control form-control-sm inp-nota n2" value="${n.n2 || ''}" min="1" max="10"></td>
             <td><input type="number" class="form-control form-control-sm inp-nota i2" value="${n.i2 || ''}" min="1" max="10" disabled></td>
-            
             <td class="bg-info bg-opacity-10 fw-bold"><span class="promedio">-</span></td>
             <td><input type="number" class="form-control form-control-sm inp-nota dic" value="${n.dic || ''}" min="1" max="10" disabled></td>
             <td><input type="number" class="form-control form-control-sm inp-nota feb" value="${n.feb || ''}" min="1" max="10" disabled></td>
@@ -445,13 +362,11 @@ function renderFilasNotas(estudiantes) {
 }
 
 function calcularLogicaFila(tr) {
-    // 1. HELPER: Obtener valor numérico seguro (o null si está vacío)
     const getVal = (cls) => {
         let v = tr.querySelector('.' + cls).value;
         return v === "" ? null : parseFloat(v);
     };
     
-    // 2. ELEMENTOS DOM (Para poder bloquearlos/desbloquearlos)
     const inI1 = tr.querySelector('.i1');
     const inI2 = tr.querySelector('.i2');
     const inDic = tr.querySelector('.dic');
@@ -459,188 +374,100 @@ function calcularLogicaFila(tr) {
     const spProm = tr.querySelector('.promedio');
     const spDef = tr.querySelector('.definitiva');
 
-    // 3. OBTENER VALORES ACTUALES
     const n1 = getVal('n1');
-    const i1 = getVal('i1');
     const n2 = getVal('n2');
-    const i2 = getVal('i2');
 
-    // =========================================================
-    // ETAPA 1: REACTIVIDAD DE INTENSIFICACIONES
-    // =========================================================
-    
-    // Si N1 es menor a 7 (y no está vacío), habilitamos Intensificación 1
-    if (n1 !== null && n1 < 7) {
-        inI1.disabled = false;
-    } else {
-        // Si N1 es >= 7 o vacío, bloqueamos y BORRAMOS Intensificación (Limpieza auto)
-        inI1.disabled = true;
-        inI1.value = ""; 
-    }
+    // 1. Reactividad Intensificaciones
+    if (n1 !== null && n1 < 7) inI1.disabled = false; 
+    else { inI1.disabled = true; inI1.value = ""; }
 
-    // Si N2 es menor a 7, habilitamos Intensificación 2
-    if (n2 !== null && n2 < 7) {
-        inI2.disabled = false;
-    } else {
-        inI2.disabled = true;
-        inI2.value = "";
-    }
+    if (n2 !== null && n2 < 7) inI2.disabled = false;
+    else { inI2.disabled = true; inI2.value = ""; }
 
-    // =========================================================
-    // ETAPA 2: APROBACIÓN POR CUATRIMESTRE
-    // =========================================================
-    
-    // Vemos valores frescos (porque acabamos de limpiar inputs si hacía falta)
+    // 2. Aprobación por Cuatrimestre
     const valI1 = getVal('i1');
     const valI2 = getVal('i2');
 
-    // Nota efectiva C1: Si N1 es >=7 vale N1. Si no, si I1 >= 7 vale I1.
-    let notaEfec1 = 0;
-    let c1Aprobado = false;
-
+    let notaEfec1 = 0, c1Aprobado = false;
     if (n1 !== null && n1 >= 7) { c1Aprobado = true; notaEfec1 = n1; }
     else if (valI1 !== null && valI1 >= 7) { c1Aprobado = true; notaEfec1 = valI1; }
 
-    // Nota efectiva C2
-    let notaEfec2 = 0;
-    let c2Aprobado = false;
-
+    let notaEfec2 = 0, c2Aprobado = false;
     if (n2 !== null && n2 >= 7) { c2Aprobado = true; notaEfec2 = n2; }
     else if (valI2 !== null && valI2 >= 7) { c2Aprobado = true; notaEfec2 = valI2; }
 
-    // =========================================================
-    // ETAPA 3: DEFINICIÓN DE TRAYECTORIA (Cascada)
-    // =========================================================
+    // 3. Cascada de Definición
+    let definitiva = "-", color = "bg-secondary", promedio = "-";
 
-    let definitiva = "-";
-    let color = "bg-secondary";
-    let promedio = "-";
-
-    // CASO A: PROMOCIONA (Todo en orden)
     if (c1Aprobado && c2Aprobado) {
         let calcProm = (notaEfec1 + notaEfec2) / 2;
-        // Si es entero (ej 8) mostramos 8, si es decimal (7.5) mostramos 7.50
         promedio = Number.isInteger(calcProm) ? calcProm : calcProm.toFixed(2);
-        
         definitiva = promedio;
         color = "bg-success"; 
-
-        // LIMPIEZA AUTOMÁTICA HACIA ABAJO
-        // Si promocionó, nos aseguramos que Diciembre y Febrero estén vacíos y cerrados
         inDic.disabled = true; inDic.value = "";
         inFeb.disabled = true; inFeb.value = "";
-    } 
-    // CASO B: NO PROMOCIONA (Falta aprobar algo)
-    else {
-        promedio = "-"; // Se oculta promedio
-        
-        // Habilitamos Diciembre automáticamente
+    } else {
+        promedio = "-";
         inDic.disabled = false;
         
         const valDic = getVal('dic');
-
         if (valDic !== null) {
             if (valDic >= 4) {
-                // APROBÓ DICIEMBRE
-                definitiva = valDic;
-                color = "bg-warning text-dark"; 
-                
-                // Limpieza automática de Febrero (ya no hace falta)
+                definitiva = valDic; color = "bg-warning text-dark";
                 inFeb.disabled = true; inFeb.value = "";
             } else {
-                // DESAPROBÓ DICIEMBRE -> Va a Febrero
-                definitiva = "C.I."; 
-                color = "bg-danger"; 
-                
-                // Habilitamos Febrero automáticamente
+                definitiva = "C.I."; color = "bg-danger";
                 inFeb.disabled = false;
-
                 const valFeb = getVal('feb');
                 if (valFeb !== null) {
-                    if (valFeb >= 4) {
-                        // APROBÓ FEBRERO
-                        definitiva = valFeb;
-                        color = "bg-warning text-dark";
-                    } else {
-                        // DESAPROBÓ FEBRERO
-                        definitiva = "Desaprobado"; 
-                        color = "bg-danger";
-                    }
+                    if (valFeb >= 4) { definitive = valFeb; color = "bg-warning text-dark"; }
+                    else { definitiva = "Desaprobado"; color = "bg-danger"; }
                 }
             }
         } else {
-            // Si Diciembre está vacío, Febrero espera (se limpia y bloquea)
-            inFeb.disabled = true; 
-            inFeb.value = "";
+            inFeb.disabled = true; inFeb.value = "";
         }
     }
 
-    // =========================================================
-    // ETAPA 4: PINTAR RESULTADOS
-    // =========================================================
     spProm.innerText = promedio;
     spDef.innerText = definitiva;
     spDef.className = `definitiva badge ${color}`;
 }
 
-
-    // =========================================================
-    // ETAPA 4: RENDERIZADO FINAL
-    // =========================================================
-    
-    spProm.innerText = promedio;
-    spDef.innerText = definitiva;
-    spDef.className = `definitiva badge ${color}`;
-}
 async function guardarNotas() {
     const filas = document.querySelectorAll('.fila-notas');
     let paquete = [];
-
     filas.forEach(tr => {
         paquete.push({
             dni: tr.getAttribute('data-dni'),
-            n1: tr.querySelector('.n1').value,
-            i1: tr.querySelector('.i1').value,
-            n2: tr.querySelector('.n2').value,
-            i2: tr.querySelector('.i2').value,
-            dic: tr.querySelector('.dic').value,
-            feb: tr.querySelector('.feb').value,
+            n1: tr.querySelector('.n1').value, i1: tr.querySelector('.i1').value,
+            n2: tr.querySelector('.n2').value, i2: tr.querySelector('.i2').value,
+            dic: tr.querySelector('.dic').value, feb: tr.querySelector('.feb').value,
             def: tr.querySelector('.definitiva').innerText
         });
     });
-
     try {
-        await fetch(URL_API, {
-            method: 'POST',
-            body: JSON.stringify({
-                op: 'guardarNotasMasivo',
-                idMateria: idMateriaActual,
-                notas: paquete
-            })
-        });
+        await fetch(URL_API, { method: 'POST', body: JSON.stringify({ op: 'guardarNotasMasivo', idMateria: idMateriaActual, notas: paquete }) });
         alert('Notas guardadas.');
     } catch(e) { alert('Error al guardar.'); }
 }
 
 function renderResumen(estudiantes) {
     if (!estudiantes || estudiantes.length === 0) return '<div class="alert alert-info">Sin datos.</div>';
-
     let aprobados = 0, recursantes = 0, totalAsist = 0;
-    
     estudiantes.forEach(e => {
         const def = e.notas && e.notas.def ? e.notas.def : '-';
         if (!isNaN(parseFloat(def)) && parseFloat(def) >= 4) aprobados++;
-        if (def === 'C.I.') recursantes++;
+        if (def === 'C.I.' || def === 'Desaprobado') recursantes++;
         totalAsist += (e.stats.porcentaje || 0);
     });
-
     const promAsist = estudiantes.length ? Math.round(totalAsist / estudiantes.length) : 0;
-
-    return `
-    <div class="row g-3 text-center">
-        <div class="col-md-4"><div class="card p-3 bg-success text-white"><h3>${aprobados}</h3><p>Aprobados</p></div></div>
-        <div class="col-md-4"><div class="card p-3 bg-danger text-white"><h3>${recursantes}</h3><p>No Aprobados</p></div></div>
-        <div class="col-md-4"><div class="card p-3 bg-info text-white"><h3>${promAsist}%</h3><p>Asistencia Promedio</p></div></div>
-    </div>`;
+    return `<div class="row g-3 text-center"><div class="col-md-4"><div class="card p-3 bg-success text-white"><h3>${aprobados}</h3><p>Aprobados</p></div></div><div class="col-md-4"><div class="card p-3 bg-danger text-white"><h3>${recursantes}</h3><p>No Aprobados</p></div></div><div class="col-md-4"><div class="card p-3 bg-info text-white"><h3>${promAsist}%</h3><p>Asistencia</p></div></div></div>`;
 }
 
+// --- 6. EVENT LISTENER EN VIVO (IMPORTANTE) ---
+document.addEventListener('input', function(e) {
+    if (e.target.classList.contains('inp-nota')) {
+        calcularLogicaFila(e.target.closest('tr'));
+    }
+});
