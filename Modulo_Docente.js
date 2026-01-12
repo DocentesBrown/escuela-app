@@ -151,7 +151,6 @@ function renderFilasAsistencia(estudiantes) {
     if(!estudiantes || !estudiantes.length) return '<tr><td colspan="4" class="text-center py-3">No hay estudiantes.</td></tr>';
     
     return estudiantes.map(e => {
-        // Estado actual (si ya se cargó o si lo marcamos antes)
         let estado = (e.asistenciaDia && e.asistenciaDia.estado) ? e.asistenciaDia.estado : ''; 
         
         let btnP = estado === 'P' ? 'btn-success' : 'btn-outline-success';
@@ -182,7 +181,7 @@ function renderFilasAsistencia(estudiantes) {
 
             <td class="text-center align-middle d-none d-sm-table-cell">
                 <span class="badge bg-primary mb-1">${e.stats.porcentaje || 0}%</span><br>
-                <span class="text-danger small fw-bold">${e.stats.faltas || 0} F.</span>
+                <span class="text-danger small fw-bold">${parseFloat(e.stats.faltas || 0)} F.</span>
             </td>
 
             <td class="text-center align-middle">
@@ -193,6 +192,7 @@ function renderFilasAsistencia(estudiantes) {
         </tr>`;
     }).join('');
 }
+
 
 function seleccionarAsistencia(btn, dni, valor) {
     // 1. Reset visual de los hermanos
@@ -315,17 +315,33 @@ async function abrirModalJustificar(dni, nombre) {
         container.innerHTML = '';
 
         if(json.data.length === 0) {
-            container.innerHTML = '<div class="alert alert-success">No hay inasistencias injustificadas.</div>';
+            container.innerHTML = '<div class="alert alert-success">No hay inasistencias para justificar.</div>';
         } else {
             json.data.forEach(f => {
-                let btn = f.justificado === 'Si' 
-                    ? `<span class="badge bg-success">Justificada</span>` 
-                    : `<button class="btn btn-sm btn-warning" onclick="justificarAccion('${dni}', '${f.fechaIso}', this)">Justificar</button>`;
+                // LÓGICA VISUAL: Si ya está justificado ('Si'), mostramos badge verde. Si no, botón amarillo.
+                let accionHtml = '';
                 
+                if (f.justificado === 'Si') {
+                    accionHtml = `<span class="badge bg-success border border-success p-2">
+                                    <i class="bi bi-check-circle-fill"></i> Justificada
+                                  </span>`;
+                } else {
+                    accionHtml = `<button class="btn btn-sm btn-warning shadow-sm" onclick="justificarAccion('${dni}', '${f.fechaIso}', this)">
+                                    Justificar
+                                  </button>`;
+                }
+                
+                // Muestra si es Ausente (A) o Tarde (T)
+                let badgeTipo = f.estado === 'T' ? 'bg-warning text-dark' : 'bg-danger';
+                let etiqueta = f.estado === 'T' ? 'Tardanza' : 'Ausente';
+
                 container.innerHTML += `
-                <div class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>${f.fecha} <span class="badge bg-danger">${f.estado}</span></span>
-                    ${btn}
+                <div class="list-group-item d-flex justify-content-between align-items-center mb-2 shadow-sm border rounded">
+                    <div>
+                        <span class="fw-bold">${f.fecha}</span> 
+                        <span class="badge ${badgeTipo} ms-2">${etiqueta}</span>
+                    </div>
+                    ${accionHtml}
                 </div>`;
             });
         }
@@ -407,31 +423,26 @@ async function verMisDatosDocente() {
 
 function renderFilasNotas(estudiantes) {
     return estudiantes.map(e => {
-        const n = e.notas || {};
+        // Nos aseguramos que n sea un objeto, si falla el backend usamos vacío
+        const n = e.notas || { n1:'', i1:'', n2:'', i2:'', dic:'', feb:'', def:'' };
+        
         return `
         <tr class="fila-notas" data-dni="${e.dni}">
             <td class="text-start ps-2 fw-bold text-truncate" style="max-width: 150px;">${e.nombre}</td>
             
-            <td><input type="number" class="form-control form-control-sm inp-nota n1" value="${n.n1}" min="1" max="10"></td>
-            <td><input type="number" class="form-control form-control-sm inp-nota i1" value="${n.i1}" min="1" max="10" disabled></td>
+            <td><input type="number" class="form-control form-control-sm inp-nota n1" value="${n.n1 || ''}" min="1" max="10"></td>
+            <td><input type="number" class="form-control form-control-sm inp-nota i1" value="${n.i1 || ''}" min="1" max="10" disabled></td>
             
-            <td><input type="number" class="form-control form-control-sm inp-nota n2" value="${n.n2}" min="1" max="10"></td>
-            <td><input type="number" class="form-control form-control-sm inp-nota i2" value="${n.i2}" min="1" max="10" disabled></td>
+            <td><input type="number" class="form-control form-control-sm inp-nota n2" value="${n.n2 || ''}" min="1" max="10"></td>
+            <td><input type="number" class="form-control form-control-sm inp-nota i2" value="${n.i2 || ''}" min="1" max="10" disabled></td>
             
             <td class="bg-info bg-opacity-10 fw-bold"><span class="promedio">-</span></td>
-            <td><input type="number" class="form-control form-control-sm inp-nota dic" value="${n.dic}" min="1" max="10" disabled></td>
-            <td><input type="number" class="form-control form-control-sm inp-nota feb" value="${n.feb}" min="1" max="10" disabled></td>
-            <td class="fw-bold fs-6 text-center"><span class="definitiva badge bg-secondary">-</span></td>
+            <td><input type="number" class="form-control form-control-sm inp-nota dic" value="${n.dic || ''}" min="1" max="10" disabled></td>
+            <td><input type="number" class="form-control form-control-sm inp-nota feb" value="${n.feb || ''}" min="1" max="10" disabled></td>
+            <td class="fw-bold fs-6 text-center"><span class="definitiva badge bg-secondary">${n.def || '-'}</span></td>
         </tr>`;
     }).join('');
 }
-
-// Listener para cálculo automático
-document.addEventListener('input', function(e) {
-    if (e.target.classList.contains('inp-nota')) {
-        calcularLogicaFila(e.target.closest('tr'));
-    }
-});
 
 function calcularLogicaFila(tr) {
     const getVal = (cls) => {
