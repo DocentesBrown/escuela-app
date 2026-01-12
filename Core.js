@@ -77,7 +77,6 @@ function cargarDashboard(usuario) {
     // --- CONFIGURACIÓN DE MENÚS POR ROL ---
     
     if (rol === 'directivo') {
-        agregarBoton('📊 Panel', '📊', 'verEstudiantes()'); // Función que carga inicio
         agregarBoton('🎓 Estudiantes', '🎓', 'verEstudiantes()');
         agregarBoton('👨‍🏫 Docentes', '👨‍🏫', 'verDocentes()');
         agregarBoton('📋 Preceptores', '📋', 'verPreceptores()');
@@ -85,12 +84,12 @@ function cargarDashboard(usuario) {
     
     if (rol === 'preceptor') {
         agregarBoton('📝 Asistencia', '📝', 'iniciarModuloPreceptor()', 'active');
-        agregarBoton('📞 Contactos', '📞', 'verContactosDocentes()');
+        agregarBoton('📞 Docentes', '📞', 'verContactosDocentes()');
     }
     
     if (rol === 'docente') {
         agregarBoton('🏫 Cursos', '🏫', 'iniciarModuloDocente()', 'active');
-        agregarBoton('👤 Mis Datos', '👤', 'verMisDatosDocente()');
+        agregarBoton('👤 Datos', '👤', 'verMisDatosDocente()');
     }
 
     // Botón Salir (Siempre al final)
