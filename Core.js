@@ -1,11 +1,9 @@
 // ============================================================================
-// ARCHIVO: Core.js
+// ARCHIVO: Core.js (ADAPTADO A ESTÉTICA DOCENTES BROWN / APPLE)
 // ============================================================================
 
-// --- TU URL DE GOOGLE APPS SCRIPT (CAMBIALA SI ES NECESARIO) ---
 const URL_API = "https://script.google.com/macros/s/AKfycbyTGnoS8hevr6k7pXE16p7KtcQxYrYP0yc11yJoJyvfX8Z7pEKJ5ZYymJ--IBcoVqUB/exec"; 
 
-// --- VARIABLES GLOBALES ---
 let usuarioActual = null;
 let baseDatosAlumnos = []; 
 let baseDatosDocentes = []; 
@@ -38,7 +36,7 @@ async function iniciarSesion() {
         }
     } catch (e) {
         console.error(e);
-        errorMsg.innerText = "Error de conexión.";
+        errorMsg.innerText = "Error de conexión. Intenta nuevamente.";
         errorMsg.classList.remove('d-none');
     } finally {
         btn.innerText = "Ingresar";
@@ -46,81 +44,124 @@ async function iniciarSesion() {
     }
 }
 
-function cargarDashboard(usuario) {
-    // 1. Ocultar Login y Mostrar App (Corregido ID 'app-screen')
+function cargarDashboard(user) {
+    // 1. Ocultar login, mostrar dashboard
     document.getElementById('login-screen').classList.add('d-none');
-    document.getElementById('app-screen').classList.remove('d-none'); 
+    document.getElementById('dashboard-screen').classList.remove('d-none');
     
-    // 2. Cargar Datos Usuario
-    document.getElementById('user-name').innerText = usuario.nombre;
+    // 2. Cargar datos básicos de usuario
+    document.getElementById('user-name').innerText = user.nombre.split(' ')[0]; // Solo primer nombre
+    document.getElementById('user-initial').innerText = user.nombre.charAt(0).toUpperCase();
+    document.getElementById('user-initial-mobile').innerText = user.nombre.charAt(0).toUpperCase();
+    document.getElementById('user-role-display').innerText = user.rol.toUpperCase();
 
-    const rol = usuario.rol.toLowerCase();
-    const menuLateral = document.getElementById('menu-lateral');
-    const menuMovil = document.getElementById('navbar-mobile'); 
+    // 3. Generar Menús (Desktop y Mobile)
+    generarMenu(user.rol);
+}
+
+function generarMenu(rol) {
+    const menuLateral = document.getElementById('menu-lateral'); // Desktop
+    const menuMovil = document.getElementById('menu-movil');     // Mobile
     
     menuLateral.innerHTML = '';
-    menuMovil.innerHTML = ''; 
+    menuMovil.innerHTML = '';
 
-    // --- FUNCIÓN HELPER MEJORADA PARA IOS ---
-    const agregarBoton = (texto, icono, onclick, claseEstado = '') => {
-        
-        // A. Versión Escritorio (Lista limpia)
-        // Si claseEstado es 'active', el CSS lo pinta de azul automáticamente
-        menuLateral.innerHTML += `
-            <button class="list-group-item list-group-item-action ${claseEstado}" onclick="${onclick}">
-                <span class="me-2">${icono}</span> ${texto}
-            </button>`;
-            
-        // B. Versión Móvil (Dock iOS)
-        // Usamos la clase .active real para que tome el color de la marca
-        // El CSS se encarga del tamaño de la fuente, no ponemos styles en linea.
-        menuMovil.innerHTML += `
-            <button onclick="${onclick}" class="${claseEstado === 'active' ? 'active' : ''}">
-                <span>${icono}</span>
-                <span>${texto.split(' ')[1] || texto}</span> 
-            </button>`;
+    // Función auxiliar para crear botones
+    const crearBoton = (texto, icono, accion, activo = false) => {
+        // Desktop HTML
+        const btnDesk = document.createElement('button');
+        btnDesk.className = `sidebar-btn ${activo ? 'active' : ''}`;
+        btnDesk.onclick = () => { 
+            eval(accion); 
+            actualizarTitulos(texto);
+            setActive(btnDesk, 'desktop'); 
+        };
+        btnDesk.innerHTML = `<span>${icono}</span> ${texto}`;
+        menuLateral.appendChild(btnDesk);
+
+        // Mobile HTML
+        const btnMov = document.createElement('button');
+        btnMov.className = `nav-item-mobile ${activo ? 'active' : ''}`;
+        btnMov.onclick = () => { 
+            eval(accion); 
+            actualizarTitulos(texto);
+            setActive(btnMov, 'mobile'); 
+        };
+        btnMov.innerHTML = `<span class="icon">${icono}</span><span>${texto}</span>`;
+        menuMovil.appendChild(btnMov);
     };
 
-    // --- CONFIGURACIÓN DE MENÚS POR ROL ---
-    
+    // --- LÓGICA DE ROLES ---
     if (rol === 'directivo') {
-        // En directivos no solemos marcar uno como activo por defecto, o sí, depende tu gusto.
-        agregarBoton('Estudiantes', '🎓', 'verEstudiantes()'); 
-        agregarBoton('Docentes', '👨‍🏫', 'verDocentes()');
-        agregarBoton('Preceptores', '📋', 'verPreceptores()');
+        crearBoton('Estudiantes', '🎓', 'verEstudiantes()', true); // Default
+        crearBoton('Docentes', '👨‍🏫', 'verDocentes()');
+        crearBoton('Preceptores', '📋', 'verPreceptores()');
+        
+        // Cargar vista por defecto
+        setTimeout(verEstudiantes, 100); 
     }
     
     if (rol === 'preceptor') {
-        agregarBoton('Asistencia', '📝', 'iniciarModuloPreceptor()', 'active');
-        agregarBoton('Docentes', '📞', 'verContactosDocentes()');
+        crearBoton('Asistencia', '📝', 'iniciarModuloPreceptor()', true);
+        crearBoton('Docentes', '📞', 'verContactosDocentes()');
+        setTimeout(iniciarModuloPreceptor, 100);
     }
     
     if (rol === 'docente') {
-        agregarBoton('Cursos', '🏫', 'iniciarModuloDocente()', 'active');
-        agregarBoton('Datos', '👤', 'verMisDatosDocente()');
+        crearBoton('Cursos', '🏫', 'iniciarModuloDocente()', true);
+        crearBoton('Mis Datos', '👤', 'verMisDatosDocente()');
+        setTimeout(iniciarModuloDocente, 100);
     }
 
-    // Botón Salir (Siempre al final) - Versión Móvil
-    menuMovil.innerHTML += `
-        <button onclick="location.reload()" class="text-secondary">
-            <span>🚪</span>
-            <span>Salir</span>
-        </button>`;
-        
-    // Botón Salir - Versión Escritorio
-    menuLateral.innerHTML += `
-        <button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">
-            <span class="me-2">🚪</span> Cerrar Sesión
-        </button>`;
+    // Botón salir extra en móvil (en desktop está fijo abajo)
+    const btnSalirMovil = document.createElement('button');
+    btnSalirMovil.className = 'nav-item-mobile text-danger';
+    btnSalirMovil.onclick = () => location.reload();
+    btnSalirMovil.innerHTML = `<span class="icon">🚪</span><span>Salir</span>`;
+    menuMovil.appendChild(btnSalirMovil);
 }
 
+// Helpers visuales
+function setActive(elemento, modo) {
+    if (modo === 'desktop') {
+        document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+        elemento.classList.add('active');
+    } else {
+        document.querySelectorAll('.nav-item-mobile').forEach(b => b.classList.remove('active'));
+        elemento.classList.add('active');
+    }
+}
+
+function actualizarTitulos(titulo) {
+    document.getElementById('titulo-seccion').innerText = titulo;
+    document.getElementById('subtitulo-seccion').innerText = "Gestión de " + titulo.toLowerCase();
+}
 
 function calcularEdad(fechaString) {
     if (!fechaString) return "-";
     const hoy = new Date();
     const nacimiento = new Date(fechaString);
     let edad = hoy.getFullYear() - nacimiento.getFullYear();
-    const mes = hoy.getMonth() - nacimiento.getMonth();
-    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) { edad--; }
-    return isNaN(edad) ? "-" : edad + " años";
+    const m = hoy.getMonth() - nacimiento.getMonth();
+    if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getDate())) {
+        edad--;
+    }
+    return isNaN(edad) ? "-" : edad;
 }
+
+// Función auxiliar para detectar móvil y renderizar contenido en el div correcto
+// Modificamos el comportamiento de los otros scripts para que rendericen en ambos contenedores si es necesario
+// O mejor, usamos un observer. Pero por simplicidad, en index.html duplicamos IDs o usamos clases.
+// ESTRATEGIA: El index.html ahora tiene dos divs de contenido. 
+// Para evitar romper los scripts Admin_*.js que buscan 'contenido-dinamico',
+// vamos a hacer un truco:
+const observer = new MutationObserver((mutations) => {
+    // Si cambia el contenido desktop, copiamos al movil
+    const desktopContent = document.getElementById('contenido-dinamico').innerHTML;
+    const mobileContainer = document.getElementById('contenido-dinamico-movil');
+    if(mobileContainer.innerHTML !== desktopContent) {
+        mobileContainer.innerHTML = desktopContent;
+    }
+});
+
+observer.observe(document.getElementById('contenido-dinamico'), { childList: true, subtree: true });
