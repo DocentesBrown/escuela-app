@@ -47,37 +47,45 @@ async function iniciarSesion() {
 }
 
 function cargarDashboard(usuario) {
+    // 1. Ocultar Login y Mostrar App (Corregido ID 'app-screen')
     document.getElementById('login-screen').classList.add('d-none');
-    document.getElementById('dashboard-screen').classList.remove('d-none');
+    document.getElementById('app-screen').classList.remove('d-none'); 
+    
+    // 2. Cargar Datos Usuario
     document.getElementById('user-name').innerText = usuario.nombre;
 
     const rol = usuario.rol.toLowerCase();
     const menuLateral = document.getElementById('menu-lateral');
-    const menuMovil = document.getElementById('navbar-mobile'); // NUEVO
+    const menuMovil = document.getElementById('navbar-mobile'); 
     
     menuLateral.innerHTML = '';
-    menuMovil.innerHTML = ''; // Limpiar móvil
+    menuMovil.innerHTML = ''; 
 
-    // --- FUNCIÓN HELPER PARA AGREGAR BOTONES ---
-    const agregarBoton = (texto, icono, onclick, claseColor = '') => {
-        // 1. Versión Escritorio (Lista)
+    // --- FUNCIÓN HELPER MEJORADA PARA IOS ---
+    const agregarBoton = (texto, icono, onclick, claseEstado = '') => {
+        
+        // A. Versión Escritorio (Lista limpia)
+        // Si claseEstado es 'active', el CSS lo pinta de azul automáticamente
         menuLateral.innerHTML += `
-            <button class="list-group-item list-group-item-action ${claseColor}" onclick="${onclick}">
-                ${texto}
+            <button class="list-group-item list-group-item-action ${claseEstado}" onclick="${onclick}">
+                <span class="me-2">${icono}</span> ${texto}
             </button>`;
             
-        // 2. Versión Móvil (Icono + Texto)
-        // Usamos emojis como iconos si no tienes FontAwesome, o cámbialos por <i class="bi bi-..."></i>
+        // B. Versión Móvil (Dock iOS)
+        // Usamos la clase .active real para que tome el color de la marca
+        // El CSS se encarga del tamaño de la fuente, no ponemos styles en linea.
         menuMovil.innerHTML += `
-            <button onclick="${onclick}" class="${claseColor ? 'text-primary' : ''}">
-                <span style="font-size:20px;">${icono}</span>
-                <span>${texto.split(' ')[1] || texto}</span> </button>`;
+            <button onclick="${onclick}" class="${claseEstado === 'active' ? 'active' : ''}">
+                <span>${icono}</span>
+                <span>${texto.split(' ')[1] || texto}</span> 
+            </button>`;
     };
 
     // --- CONFIGURACIÓN DE MENÚS POR ROL ---
     
     if (rol === 'directivo') {
-        agregarBoton('🎓 Estudiantes', '🎓', 'verEstudiantes()');
+        // En directivos no solemos marcar uno como activo por defecto, o sí, depende tu gusto.
+        agregarBoton('🎓 Estudiantes', '🎓', 'verEstudiantes()'); 
         agregarBoton('👨‍🏫 Docentes', '👨‍🏫', 'verDocentes()');
         agregarBoton('📋 Preceptores', '📋', 'verPreceptores()');
     }
@@ -92,15 +100,21 @@ function cargarDashboard(usuario) {
         agregarBoton('👤 Datos', '👤', 'verMisDatosDocente()');
     }
 
-    // Botón Salir (Siempre al final)
+    // Botón Salir (Siempre al final) - Versión Móvil
     menuMovil.innerHTML += `
-        <button onclick="location.reload()" class="text-danger">
-            <span style="font-size:20px;">🚪</span>
+        <button onclick="location.reload()" class="text-secondary">
+            <span>🚪</span>
             <span>Salir</span>
         </button>`;
         
-    menuLateral.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Cerrar Sesión</button>`;
+    // Botón Salir - Versión Escritorio
+    menuLateral.innerHTML += `
+        <button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">
+            <span class="me-2">🚪</span> Cerrar Sesión
+        </button>`;
 }
+
+
 function calcularEdad(fechaString) {
     if (!fechaString) return "-";
     const hoy = new Date();
