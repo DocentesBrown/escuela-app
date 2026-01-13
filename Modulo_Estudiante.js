@@ -93,49 +93,69 @@ function verDetalleMateria(id) {
 
     const contenedor = document.getElementById('contenido-dinamico');
     
-    // Generamos la lista de notas HTML
-    let listaNotas = '';
+    // GENERAR LISTA DE NOTAS (RENGLÓN POR RENGLÓN)
+    let htmlNotas = '';
+    
     if (materia.notas && materia.notas.length > 0) {
+        htmlNotas = `<ul class="list-group list-group-flush shadow-sm rounded mb-3">`;
+        
         materia.notas.forEach(n => {
-            listaNotas += `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>${n.instancia}</span> <span class="badge bg-primary rounded-pill" style="font-size: 1em;">${n.valor}</span>
+            // Color para aprobados/desaprobados visual
+            let colorNota = 'text-dark';
+            let valorNum = parseFloat(n.valor);
+            if (!isNaN(valorNum)) {
+                if (valorNum >= 7) colorNota = 'text-success fw-bold';
+                else if (valorNum >= 4) colorNota = 'text-warning fw-bold';
+                else colorNota = 'text-danger fw-bold';
+            }
+            
+            // Cada nota es un Item de lista (un renglón)
+            htmlNotas += `
+                <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                    <span class="text-muted">${n.instancia}</span>
+                    <span class="fs-5 ${colorNota}">${n.valor}</span>
                 </li>`;
         });
+        
+        htmlNotas += `</ul>`;
     } else {
-        listaNotas = `<li class="list-group-item text-muted fst-italic">No hay notas registradas aún.</li>`;
+        htmlNotas = `
+            <div class="alert alert-light border text-center py-4">
+                <p class="mb-0 text-muted fst-italic">Aún no hay notas cargadas para esta materia.</p>
+            </div>`;
     }
 
-    // Renderizamos la vista de detalle
+    // Renderizar Vista Detalle
     contenedor.innerHTML = `
         <button class="btn btn-outline-secondary mb-3" onclick="renderizarGridMaterias(datosEstudianteCache)">
-            ⬅ Volver a Materias
+            ⬅ Volver
         </button>
 
         <div class="card shadow border-0">
             <div class="card-header bg-primary text-white py-3">
-                <h3 class="mb-0">${materia.materia}</h3>
-                <span class="opacity-75">Profesor: ${materia.profesor || 'Sin asignar'}</span>
+                <h3 class="mb-0 text-white">${materia.materia}</h3>
+                <span class="badge bg-white text-primary mt-2">${materia.estado}</span>
             </div>
+            
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-7 mb-4">
-                        <h5 class="border-bottom pb-2 mb-3">📊 Calificaciones</h5>
-                        <ul class="list-group list-group-flush shadow-sm rounded">
-                            ${listaNotas}
-                        </ul>
-                        <div class="mt-3 text-end">
-                            <span class="fs-5 text-muted">Promedio General: </span>
-                            <span class="fs-4 fw-bold">${materia.promedio || '-'}</span>
-                        </div>
+                        <h5 class="border-bottom pb-2 mb-3 text-primary">📊 Calificaciones</h5>
+                        ${htmlNotas}
                     </div>
 
                     <div class="col-md-5">
-                        <h5 class="border-bottom pb-2 mb-3">📅 Situación de Asistencia</h5>
-                        <div class="card bg-light border-0 text-center py-4">
-                            <h1 class="display-1 fw-bold ${materia.faltas > 15 ? 'text-danger' : 'text-dark'}">${materia.faltas || 0}</h1>
-                            <p class="text-muted text-uppercase fw-bold ls-1">Faltas Injustificadas</p>
-                            <small class="text-muted px-3">Recuerda justificar tus inasistencias dentro de las 48hs.</small>
+                        <div class="card bg-light border-0 mb-3">
+                            <div class="card-body">
+                                <h6 class="text-muted text-uppercase small fw-bold">Docente a cargo</h6>
+                                <p class="fs-5 fw-bold mb-0 text-dark">👨‍🏫 ${materia.profesor || 'Sin asignar'}</p>
+                            </div>
+                        </div>
+
+                        <h5 class="border-bottom pb-2 mb-3 text-primary mt-4">📅 Asistencia</h5>
+                        <div class="card border-danger border-2 text-center py-3">
+                            <h1 class="display-3 fw-bold text-danger mb-0">${materia.faltas || 0}</h1>
+                            <p class="text-muted text-uppercase fw-bold small mb-0">Inasistencias</p>
                         </div>
                     </div>
                 </div>
