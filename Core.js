@@ -1,5 +1,5 @@
 // ============================================================================
-// ARCHIVO: Core.js (ADAPTADO A ESTÉTICA DOCENTES BROWN / APPLE)
+// ARCHIVO: Core.js (CORREGIDO - ROLES Y MENÚS)
 // ============================================================================
 
 const URL_API = "https://script.google.com/macros/s/AKfycbyTGnoS8hevr6k7pXE16p7KtcQxYrYP0yc11yJoJyvfX8Z7pEKJ5ZYymJ--IBcoVqUB/exec"; 
@@ -19,6 +19,7 @@ async function iniciarSesion() {
     const btn = document.getElementById('btn-login');
     const errorMsg = document.getElementById('error-msg');
     
+    // Reset visual
     btn.innerText = "Verificando...";
     btn.disabled = true;
     errorMsg.classList.add('d-none');
@@ -31,11 +32,11 @@ async function iniciarSesion() {
             usuarioActual = data;
             cargarDashboard(data);
         } else {
-            errorMsg.innerText = data.message;
+            errorMsg.innerText = data.message || "Credenciales incorrectas";
             errorMsg.classList.remove('d-none');
         }
     } catch (e) {
-        console.error(e);
+        console.error("Error de login:", e);
         errorMsg.innerText = "Error de conexión. Intenta nuevamente.";
         errorMsg.classList.remove('d-none');
     } finally {
@@ -45,45 +46,64 @@ async function iniciarSesion() {
 }
 
 function cargarDashboard(user) {
+    console.log("Cargando Dashboard para:", user.rol); // Debug
+
     // 1. Ocultar login, mostrar dashboard
     document.getElementById('login-screen').classList.add('d-none');
     document.getElementById('dashboard-screen').classList.remove('d-none');
     
-    // 2. Cargar datos básicos de usuario
-    document.getElementById('user-name').innerText = user.nombre.split(' ')[0]; // Solo primer nombre
-    document.getElementById('user-initial').innerText = user.nombre.charAt(0).toUpperCase();
-    document.getElementById('user-initial-mobile').innerText = user.nombre.charAt(0).toUpperCase();
+    // 2. Cargar datos básicos de usuario (Evitamos errores si falta el nombre)
+    const nombreMostrar = user.nombre ? user.nombre.split(' ')[0] : 'Usuario';
+    const inicial = user.nombre ? user.nombre.charAt(0).toUpperCase() : 'U';
+
+    document.getElementById('user-name').innerText = nombreMostrar;
+    document.getElementById('user-initial').innerText = inicial;
+    
+    // Elementos móviles si existen
+    const initialMobile = document.getElementById('user-initial-mobile');
+    if(initialMobile) initialMobile.innerText = inicial;
+
     document.getElementById('user-role-display').innerText = user.rol.toUpperCase();
 
     // 3. Generar Menús (Desktop y Mobile)
     generarMenu(user.rol);
 }
 
-function generarMenu(rol) {
+function generarMenu(rolOriginal) {
     const menuLateral = document.getElementById('menu-lateral'); // Desktop
     const menuMovil = document.getElementById('menu-movil');     // Mobile
     
+    if(!menuLateral || !menuMovil) {
+        console.error("Error: No encuentro los contenedores del menú en el HTML");
+        return;
+    }
+
     menuLateral.innerHTML = '';
     menuMovil.innerHTML = '';
 
+    // AQUI ESTA LA CORRECCION: Normalizamos el rol a minúsculas y sin espacios
+    const rol = rolOriginal.toString().trim().toLowerCase();
+    console.log("Generando menú para rol normalizado:", rol);
+
     // Función auxiliar para crear botones
     const crearBoton = (texto, icono, accion, activo = false) => {
-        // Desktop HTML
+        // 1. Botón Desktop (Sidebar)
         const btnDesk = document.createElement('button');
         btnDesk.className = `sidebar-btn ${activo ? 'active' : ''}`;
+        // Usamos una función anónima para evitar problemas con eval()
         btnDesk.onclick = () => { 
-            eval(accion); 
+            ejecutarAccion(accion);
             actualizarTitulos(texto);
             setActive(btnDesk, 'desktop'); 
         };
         btnDesk.innerHTML = `<span>${icono}</span> ${texto}`;
         menuLateral.appendChild(btnDesk);
 
-        // Mobile HTML
+        // 2. Botón Mobile (Bottom Nav)
         const btnMov = document.createElement('button');
         btnMov.className = `nav-item-mobile ${activo ? 'active' : ''}`;
         btnMov.onclick = () => { 
-            eval(accion); 
+            ejecutarAccion(accion);
             actualizarTitulos(texto);
             setActive(btnMov, 'mobile'); 
         };
@@ -92,33 +112,54 @@ function generarMenu(rol) {
     };
 
     // --- LÓGICA DE ROLES ---
-    if (rol === 'directivo') {
-        crearBoton('Estudiantes', '🎓', 'verEstudiantes()', true); // Default
-        crearBoton('Docentes', '👨‍🏫', 'verDocentes()');
-        crearBoton('Preceptores', '📋', 'verPreceptores()');
-        
-        // Cargar vista por defecto
-        setTimeout(verEstudiantes, 100); 
+    
+    // ROL: DIRECTIVO
+    if (rol === 'directivo' || rol === 'director' || rol === 'admin') {
+        crearBoton('Estudiantes', '🎓', 'verEstudiantes', true);
+        crearBoton('Docentes', '👨‍🏫', 'verDocentes');
+        crearBoton('Preceptores', '📋', 'verPreceptores');
+        // Cargar vista inicial
+        setTimeout(() => { if(typeof verEstudiantes === 'function') verEstudiantes(); }, 100);
     }
     
-    if (rol === 'preceptor') {
-        crearBoton('Asistencia', '📝', 'iniciarModuloPreceptor()', true);
-        crearBoton('Docentes', '📞', 'verContactosDocentes()');
-        setTimeout(iniciarModuloPreceptor, 100);
+    // ROL: PRECEPTOR
+    else if (rol === 'preceptor') {
+        crearBoton('Asistencia', '📝', 'iniciarModuloPreceptor', true);
+        crearBoton('Docentes', '📞', 'verContactosDocentes'); // Asegúrate que esta función exista en Modulo_Preceptor
+        setTimeout(() => { if(typeof iniciarModuloPreceptor === 'function') iniciarModuloPreceptor(); }, 100);
     }
     
-    if (rol === 'docente') {
-        crearBoton('Cursos', '🏫', 'iniciarModuloDocente()', true);
-        crearBoton('Mis Datos', '👤', 'verMisDatosDocente()');
-        setTimeout(iniciarModuloDocente, 100);
+    // ROL: DOCENTE
+    else if (rol === 'docente' || rol === 'profesor') {
+        crearBoton('Cursos', '🏫', 'iniciarModuloDocente', true);
+        crearBoton('Mis Datos', '👤', 'verMisDatosDocente'); // Asegúrate que esta función exista
+        setTimeout(() => { if(typeof iniciarModuloDocente === 'function') iniciarModuloDocente(); }, 100);
+    } 
+    
+    // ROL DESCONOCIDO (Fallback)
+    else {
+        menuLateral.innerHTML = `<div class="p-3 text-danger">Rol no reconocido: ${rol}</div>`;
     }
 
-    // Botón salir extra en móvil (en desktop está fijo abajo)
+    // Botón Salir Móvil (siempre al final)
     const btnSalirMovil = document.createElement('button');
     btnSalirMovil.className = 'nav-item-mobile text-danger';
     btnSalirMovil.onclick = () => location.reload();
     btnSalirMovil.innerHTML = `<span class="icon">🚪</span><span>Salir</span>`;
     menuMovil.appendChild(btnSalirMovil);
+}
+
+// Ejecutor seguro de funciones
+function ejecutarAccion(nombreFuncion) {
+    // Busca la función en el ámbito global (window)
+    if (typeof window[nombreFuncion] === "function") {
+        window[nombreFuncion]();
+    } else {
+        console.error(`La función ${nombreFuncion} no existe o no se cargó.`);
+        // Feedback visual si falla
+        document.getElementById('contenido-dinamico').innerHTML = 
+            `<div class="alert alert-danger">Error: No se encontró la función del módulo (${nombreFuncion}).</div>`;
+    }
 }
 
 // Helpers visuales
@@ -133,9 +174,13 @@ function setActive(elemento, modo) {
 }
 
 function actualizarTitulos(titulo) {
-    document.getElementById('titulo-seccion').innerText = titulo;
-    document.getElementById('subtitulo-seccion').innerText = "Gestión de " + titulo.toLowerCase();
+    const t = document.getElementById('titulo-seccion');
+    const s = document.getElementById('subtitulo-seccion');
+    if(t) t.innerText = titulo;
+    if(s) s.innerText = "Gestión de " + titulo.toLowerCase();
 }
+
+// --- UTILIDADES GLOBALES NECESARIAS PARA OTROS MÓDULOS ---
 
 function calcularEdad(fechaString) {
     if (!fechaString) return "-";
@@ -149,19 +194,18 @@ function calcularEdad(fechaString) {
     return isNaN(edad) ? "-" : edad;
 }
 
-// Función auxiliar para detectar móvil y renderizar contenido en el div correcto
-// Modificamos el comportamiento de los otros scripts para que rendericen en ambos contenedores si es necesario
-// O mejor, usamos un observer. Pero por simplicidad, en index.html duplicamos IDs o usamos clases.
-// ESTRATEGIA: El index.html ahora tiene dos divs de contenido. 
-// Para evitar romper los scripts Admin_*.js que buscan 'contenido-dinamico',
-// vamos a hacer un truco:
-const observer = new MutationObserver((mutations) => {
-    // Si cambia el contenido desktop, copiamos al movil
-    const desktopContent = document.getElementById('contenido-dinamico').innerHTML;
-    const mobileContainer = document.getElementById('contenido-dinamico-movil');
-    if(mobileContainer.innerHTML !== desktopContent) {
-        mobileContainer.innerHTML = desktopContent;
+// Observador para sincronizar contenido Desktop <-> Mobile
+// (Esto asegura que si el JS de Docentes actualiza el div desktop, se vea en mobile también)
+document.addEventListener("DOMContentLoaded", () => {
+    const targetNode = document.getElementById('contenido-dinamico');
+    const mobileNode = document.getElementById('contenido-dinamico-movil');
+    
+    if(targetNode && mobileNode) {
+        const config = { childList: true, subtree: true };
+        const callback = (mutationsList, observer) => {
+            mobileNode.innerHTML = targetNode.innerHTML;
+        };
+        const observer = new MutationObserver(callback);
+        observer.observe(targetNode, config);
     }
 });
-
-observer.observe(document.getElementById('contenido-dinamico'), { childList: true, subtree: true });
