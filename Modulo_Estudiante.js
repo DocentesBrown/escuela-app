@@ -43,29 +43,38 @@ function renderizarGridMaterias(materias) {
     <div class="row g-3">`;
 
     materias.forEach(mat => {
-        // Calculamos un color para el borde según el promedio (opcional)
-        let bordeColor = mat.promedio >= 7 ? 'border-success' : (mat.promedio >= 4 ? 'border-warning' : 'border-danger');
-        if(!mat.promedio) bordeColor = 'border-primary';
+        // Lógica de colores según el Estado
+        let badgeColor = 'bg-secondary';
+        let textoEstado = mat.estado || 'Regular';
+
+        // Detectamos palabras clave para colorear
+        if (textoEstado.toLowerCase().includes('recursa')) badgeColor = 'bg-danger';      // Rojo para recursantes
+        else if (textoEstado.toLowerCase().includes('intensifica')) badgeColor = 'bg-warning text-dark'; // Amarillo para intensificación
+        else if (textoEstado.toLowerCase().includes('cursa')) badgeColor = 'bg-success';  // Verde para cursada normal
 
         html += `
         <div class="col-md-4 col-sm-6">
-            <div class="card shadow-sm h-100 ${bordeColor} border-start border-4" 
+            <div class="card shadow-sm h-100 border-start border-4 border-primary" 
                  onclick="verDetalleMateria('${mat.id}')" 
                  style="cursor:pointer; transition: transform 0.2s;" 
                  onmouseover="this.style.transform='scale(1.02)'" 
                  onmouseout="this.style.transform='scale(1)'">
                 
                 <div class="card-body">
-                    <h5 class="card-title fw-bold text-dark mb-1">${mat.materia}</h5>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title fw-bold text-dark mb-0 text-truncate" style="max-width: 70%;">${mat.materia}</h5>
+                        <span class="badge ${badgeColor}">${textoEstado}</span>
+                    </div>
+                    
                     <p class="card-text text-muted small mb-3">👨‍🏫 ${mat.profesor || 'Docente a designar'}</p>
                     
                     <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded">
                         <div class="text-center">
-                            <small class="d-block text-muted">Promedio</small>
-                            <span class="fw-bold ${mat.promedio ? 'text-dark' : 'text-muted'}">${mat.promedio || '-'}</span>
+                            <small class="d-block text-muted" style="font-size:0.75rem">Promedio</small>
+                            <span class="fw-bold ${mat.promedio && mat.promedio >= 7 ? 'text-success' : 'text-dark'}">${mat.promedio || '-'}</span>
                         </div>
                         <div class="text-center border-start ps-3">
-                            <small class="d-block text-muted">Faltas</small>
+                            <small class="d-block text-muted" style="font-size:0.75rem">Faltas</small>
                             <span class="fw-bold ${mat.faltas > 10 ? 'text-danger' : 'text-dark'}">${mat.faltas || 0}</span>
                         </div>
                     </div>
