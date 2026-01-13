@@ -11,7 +11,7 @@ async function iniciarModuloEstudiante() {
     try {
         // Solicitamos los datos al Backend usando el DNI del usuario logueado
         // IMPORTANTE: Tu Google Apps Script debe manejar la operación "getDatosEstudiante"
-        const resp = await fetch(`${URL_API}?op=getDatosEstudiante&dni=${usuarioActual.dni}`);
+        const resp = await fetch(`${URL_API}?op=getDatosEstudiante&rol=Estudiante&dni=${usuarioActual.dni}`);        
         const json = await resp.json();
 
         if (json.status !== 'success') throw new Error(json.message);
