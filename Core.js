@@ -1,15 +1,20 @@
 // ============================================================================
-// ARCHIVO: Core.js (VERSIÓN ROBUSTA / DEBUG)
+// ARCHIVO: Core.js
 // ============================================================================
 
+// --- TU URL DE GOOGLE APPS SCRIPT (CAMBIALA SI ES NECESARIO) ---
 const URL_API = "https://script.google.com/macros/s/AKfycbyTGnoS8hevr6k7pXE16p7KtcQxYrYP0yc11yJoJyvfX8Z7pEKJ5ZYymJ--IBcoVqUB/exec"; 
 
+// --- VARIABLES GLOBALES ---
 let usuarioActual = null;
 let baseDatosAlumnos = []; 
 let baseDatosDocentes = []; 
 let baseDatosPreceptores = [];
 
-// --- INICIO DE SESIÓN ---
+// ==========================================
+// LOGIN Y DASHBOARD
+// ==========================================
+
 async function iniciarSesion() {
     const email = document.getElementById('email').value;
     const clave = document.getElementById('clave').value;
@@ -26,180 +31,82 @@ async function iniciarSesion() {
 
         if (data.status === 'success') {
             usuarioActual = data;
-            // ALERT: Confirmación visual temporal
-            // alert("Login exitoso. Rol detectado: " + data.rol); 
             cargarDashboard(data);
         } else {
-            throw new Error(data.message || "Datos incorrectos");
+            errorMsg.innerText = data.message;
+            errorMsg.classList.remove('d-none');
         }
     } catch (e) {
-        errorMsg.innerText = e.message;
+        console.error(e);
+        errorMsg.innerText = "Error de conexión.";
         errorMsg.classList.remove('d-none');
-        alert("Error al ingresar: " + e.message);
     } finally {
         btn.innerText = "Ingresar";
         btn.disabled = false;
     }
 }
 
-function cargarDashboard(user) {
-    try {
-        // 1. Ocultar Login / Mostrar Dashboard
-        document.getElementById('login-screen').classList.add('d-none');
-        document.getElementById('dashboard-screen').classList.remove('d-none');
-        
-        // 2. Llenar datos de usuario
-        const nombre = user.nombre || "Usuario";
-        document.getElementById('user-name').innerText = nombre.split(' ')[0];
-        document.getElementById('user-initial').innerText = nombre.charAt(0).toUpperCase();
-        
-        // Rol en pantalla
-        const rolDisplay = user.rol ? user.rol.toUpperCase() : "SIN ROL";
-        document.getElementById('user-role-display').innerText = rolDisplay;
+function cargarDashboard(usuario) {
+    document.getElementById('login-screen').classList.add('d-none');
+    document.getElementById('dashboard-screen').classList.remove('d-none');
+    document.getElementById('user-name').innerText = usuario.nombre;
 
-        // 3. Generar Menú
-        generarMenu(user.rol);
-
-    } catch (error) {
-        console.error(error);
-        alert("Error cargando el panel: " + error.message);
-    }
-}
-
-function generarMenu(rolOriginal) {
-    // Normalizar rol (quitar espacios, minúsculas)
-    const rol = rolOriginal ? rolOriginal.toString().trim().toLowerCase() : "invitado";
+    const rol = usuario.rol.toLowerCase();
+    const menuLateral = document.getElementById('menu-lateral');
+    const menuMovil = document.getElementById('navbar-mobile'); // NUEVO
     
-    const menuLateral = document.getElementById('menu-lateral');
-    const menuMovil = document.getElementById('menu-movil');
+    menuLateral.innerHTML = '';
+    menuMovil.innerHTML = ''; // Limpiar móvil
 
-    // Limpiar menús previos
-    if (menuLateral) menuLateral.innerHTML = '';
-    if (menuMovil) menuMovil.innerHTML = '';
-
-    let menuEncontrado = false;
-
-    // --- DEFINICIÓN DE BOTONES ---
-    // (Rol: DIRECTIVO / ADMIN)
-    if (['directivo', 'director', 'admin'].includes(rol)) {
-        crearBoton('Estudiantes', '🎓', 'verEstudiantes', true);
-        crearBoton('Docentes', '👨‍🏫', 'verDocentes');
-        crearBoton('Preceptores', '📋', 'verPreceptores');
-        
-        // Intentar cargar la primera pantalla automáticamente
-        setTimeout(() => {
-            if (typeof window.verEstudiantes === 'function') window.verEstudiantes();
-        }, 500);
-        menuEncontrado = true;
-    }
-
-    // (Rol: PRECEPTOR)
-    else if (rol === 'preceptor') {
-        crearBoton('Asistencia', '📝', 'iniciarModuloPreceptor', true);
-        crearBoton('Docentes', '📞', 'verContactosDocentes');
-        
-        setTimeout(() => {
-            if (typeof window.iniciarModuloPreceptor === 'function') window.iniciarModuloPreceptor();
-        }, 500);
-        menuEncontrado = true;
-    }
-
-    // (Rol: DOCENTE)
-    else if (['docente', 'profesor'].includes(rol)) {
-        crearBoton('Cursos', '🏫', 'iniciarModuloDocente', true);
-        crearBoton('Mis Datos', '👤', 'verMisDatosDocente');
-        
-        setTimeout(() => {
-            if (typeof window.iniciarModuloDocente === 'function') window.iniciarModuloDocente();
-        }, 500);
-        menuEncontrado = true;
-    }
-
-    // Si no encontró rol, mostrar aviso
-    if (!menuEncontrado) {
-        const msg = `<div class="p-3 text-danger">Tu rol "${rolOriginal}" no tiene menú asignado.</div>`;
-        if (menuLateral) menuLateral.innerHTML = msg;
-        if (menuMovil) menuMovil.innerHTML = msg;
-    }
-
-    // Botón Salir Móvil
-    if (menuMovil) {
-        const btnSalir = document.createElement('button');
-        btnSalir.className = 'nav-item-mobile text-danger';
-        btnSalir.onclick = () => location.reload();
-        btnSalir.innerHTML = `<span class="icon">🚪</span><span>Salir</span>`;
-        menuMovil.appendChild(btnSalir);
-    }
-}
-
-function crearBoton(texto, icono, nombreFuncion, activo = false) {
-    // Referencias a los contenedores
-    const menuLateral = document.getElementById('menu-lateral');
-    const menuMovil = document.getElementById('menu-movil');
-
-    // Función segura de ejecución
-    const accion = () => {
-        if (typeof window[nombreFuncion] === 'function') {
-            window[nombreFuncion]();
-            // Actualizar títulos
-            const titulo = document.getElementById('titulo-seccion');
-            if (titulo) titulo.innerText = texto;
-        } else {
-            alert(`Error: No se encuentra la función "${nombreFuncion}". Verifica que el archivo .js esté cargado.`);
-        }
+    // --- FUNCIÓN HELPER PARA AGREGAR BOTONES ---
+    const agregarBoton = (texto, icono, onclick, claseColor = '') => {
+        // 1. Versión Escritorio (Lista)
+        menuLateral.innerHTML += `
+            <button class="list-group-item list-group-item-action ${claseColor}" onclick="${onclick}">
+                ${texto}
+            </button>`;
+            
+        // 2. Versión Móvil (Icono + Texto)
+        // Usamos emojis como iconos si no tienes FontAwesome, o cámbialos por <i class="bi bi-..."></i>
+        menuMovil.innerHTML += `
+            <button onclick="${onclick}" class="${claseColor ? 'text-primary' : ''}">
+                <span style="font-size:20px;">${icono}</span>
+                <span>${texto.split(' ')[1] || texto}</span> </button>`;
     };
 
-    // 1. Botón PC
-    if (menuLateral) {
-        const btn = document.createElement('button');
-        btn.className = `sidebar-btn ${activo ? 'active' : ''}`;
-        btn.onclick = () => { 
-            limpiarClases('sidebar-btn'); 
-            btn.classList.add('active'); 
-            accion(); 
-        };
-        btn.innerHTML = `<span>${icono}</span> ${texto}`;
-        menuLateral.appendChild(btn);
+    // --- CONFIGURACIÓN DE MENÚS POR ROL ---
+    
+    if (rol === 'directivo') {
+        agregarBoton('🎓 Estudiantes', '🎓', 'verEstudiantes()');
+        agregarBoton('👨‍🏫 Docentes', '👨‍🏫', 'verDocentes()');
+        agregarBoton('📋 Preceptores', '📋', 'verPreceptores()');
+    }
+    
+    if (rol === 'preceptor') {
+        agregarBoton('📝 Asistencia', '📝', 'iniciarModuloPreceptor()', 'active');
+        agregarBoton('📞 Docentes', '📞', 'verContactosDocentes()');
+    }
+    
+    if (rol === 'docente') {
+        agregarBoton('🏫 Cursos', '🏫', 'iniciarModuloDocente()', 'active');
+        agregarBoton('👤 Datos', '👤', 'verMisDatosDocente()');
     }
 
-    // 2. Botón Celular
-    if (menuMovil) {
-        const btn = document.createElement('button');
-        btn.className = `nav-item-mobile ${activo ? 'active' : ''}`;
-        btn.onclick = () => { 
-            limpiarClases('nav-item-mobile'); 
-            btn.classList.add('active'); 
-            accion(); 
-        };
-        btn.innerHTML = `<span class="icon">${icono}</span><span>${texto}</span>`;
-        menuMovil.appendChild(btn);
-    }
+    // Botón Salir (Siempre al final)
+    menuMovil.innerHTML += `
+        <button onclick="location.reload()" class="text-danger">
+            <span style="font-size:20px;">🚪</span>
+            <span>Salir</span>
+        </button>`;
+        
+    menuLateral.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Cerrar Sesión</button>`;
 }
-
-function limpiarClases(claseBase) {
-    document.querySelectorAll('.' + claseBase).forEach(b => b.classList.remove('active'));
-}
-
-// Utilidad necesaria
-function calcularEdad(fecha) {
-    if (!fecha) return "-";
+function calcularEdad(fechaString) {
+    if (!fechaString) return "-";
     const hoy = new Date();
-    const nac = new Date(fecha);
-    let edad = hoy.getFullYear() - nac.getFullYear();
-    const m = hoy.getMonth() - nac.getMonth();
-    if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
-    return edad;
+    const nacimiento = new Date(fechaString);
+    let edad = hoy.getFullYear() - nacimiento.getFullYear();
+    const mes = hoy.getMonth() - nacimiento.getMonth();
+    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) { edad--; }
+    return isNaN(edad) ? "-" : edad + " años";
 }
-
-// Sincronización PC <-> Celular
-document.addEventListener("DOMContentLoaded", () => {
-    const desktopDiv = document.getElementById('contenido-dinamico');
-    const mobileDiv = document.getElementById('contenido-dinamico-movil');
-
-    if (desktopDiv && mobileDiv) {
-        const observer = new MutationObserver(() => {
-            mobileDiv.innerHTML = desktopDiv.innerHTML;
-        });
-        observer.observe(desktopDiv, { childList: true, subtree: true });
-    }
-});

@@ -7,36 +7,30 @@ function renderModalHTML() {
     <div class="modal fade" id="modalEstudiante" tabindex="-1">
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
-          <div class="modal-header border-0 pb-0">
-            <h5 class="modal-title fw-bold" id="modalTitle">Nuevo Estudiante</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" style="background-color: #f2f2f7; border-radius: 50%; padding: 10px;"></button>
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="modalTitle">Estudiante</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
-          <div class="modal-body pt-2">
+          <div class="modal-body">
             <form id="formEstudiante">
                 <input type="hidden" id="accion_form"><input type="hidden" id="dni_original"><input type="hidden" id="email_original">
-                
-                <h6 class="text-uppercase text-muted small fw-bold mb-3 mt-2">Datos Personales</h6>
-                
-                <div class="row g-3 mb-3">
-                    <div class="col-6">
-                        <label class="form-label small fw-bold text-muted">DNI</label>
-                        <input type="number" id="inp_dni" class="form-control" placeholder="12345678">
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label small fw-bold text-muted">Nacimiento</label>
-                        <input type="date" id="inp_nacimiento" class="form-control">
-                    </div>
+                <div class="row">
+                    <div class="col-md-6 mb-2"><label>DNI</label><input type="number" id="inp_dni" class="form-control" required></div>
+                    <div class="col-md-6 mb-2"><label>Nacimiento</label><input type="date" id="inp_nacimiento" class="form-control"></div>
                 </div>
-                
-                <div class="mb-3">
-                    <label class="form-label small fw-bold text-muted">Nombre Completo</label>
-                    <input type="text" id="inp_nombre" class="form-control" placeholder="Juan Pérez">
+                <div class="mb-2"><label>Nombre y Apellido</label><input type="text" id="inp_nombre" class="form-control" required></div>
+                <div class="row">
+                    <div class="col-md-6 mb-2"><label>Curso</label><input type="text" id="inp_curso" class="form-control" required></div>
+                    <div class="col-md-6 mb-2"><label>Email</label><input type="email" id="inp_email" class="form-control" required></div>
                 </div>
-                
-                </form>
+                <div class="row">
+                    <div class="col-6 mb-2"><label>Adulto Resp.</label><input type="text" id="inp_adulto" class="form-control"></div>
+                    <div class="col-6 mb-2"><label>Teléfono</label><input type="text" id="inp_tel" class="form-control"></div>
+                </div>
+            </form>
           </div>
-          <div class="modal-footer border-0">
-            <button type="button" class="btn btn-light text-danger" data-bs-dismiss="modal">Cancelar</button>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
             <button type="button" class="btn btn-primary" id="btnGuardarModal" onclick="guardarEstudiante()">Guardar</button>
           </div>
         </div>
