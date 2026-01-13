@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Plataforma | Docentes Brown</title>
+    <title>Docentes Brown | Plataforma</title>
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -14,14 +16,14 @@
         <div class="login-card fade-in">
             <div class="text-center mb-4">
                 <h3 class="fw-bold brand-text">Docentes Brown</h3>
-                <p class="text-muted small">Plataforma de Gestión</p>
+                <p class="text-muted small">Ingreso al Sistema</p>
             </div>
             
             <div class="mb-3">
                 <input type="email" id="email" class="form-control ios-input" placeholder="Correo electrónico">
             </div>
             <div class="mb-4">
-                <input type="password" id="clave" class="form-control ios-input" placeholder="Contraseña o DNI">
+                <input type="password" id="clave" class="form-control ios-input" placeholder="Contraseña">
             </div>
             
             <button onclick="iniciarSesion()" class="btn btn-primary w-100 ios-btn" id="btn-login">
@@ -37,10 +39,10 @@
             <aside class="sidebar">
                 <div class="p-4">
                     <h5 class="brand-text fw-bold mb-0">Docentes Brown</h5>
-                    <small class="text-muted" id="user-role-display">Panel</small>
+                    <small class="text-muted" id="user-role-display">...</small>
                 </div>
-                <nav class="nav flex-column px-2" id="menu-lateral">
-                    </nav>
+                <nav class="nav flex-column px-2" id="menu-lateral"></nav>
+                
                 <div class="mt-auto p-3">
                     <button onclick="location.reload()" class="btn btn-outline-danger w-100 ios-btn-outline btn-sm">
                         Cerrar Sesión
@@ -51,8 +53,8 @@
             <main class="main-content">
                 <header class="d-flex justify-content-between align-items-center mb-4 fade-in-down">
                     <div>
-                        <h2 class="fw-bold mb-0" id="titulo-seccion">Hola</h2>
-                        <p class="text-muted" id="subtitulo-seccion">Bienvenido a tu panel.</p>
+                        <h2 class="fw-bold mb-0" id="titulo-seccion">Inicio</h2>
+                        <p class="text-muted" id="subtitulo-seccion">Bienvenido al panel</p>
                     </div>
                     <div class="user-badge">
                         <span id="user-name">Usuario</span>
@@ -60,8 +62,7 @@
                     </div>
                 </header>
 
-                <div id="contenido-dinamico" class="fade-in">
-                    </div>
+                <div id="contenido-dinamico" class="fade-in"></div>
             </main>
         </div>
 
@@ -71,11 +72,9 @@
                 <div class="avatar-circle small" id="user-initial-mobile">U</div>
             </header>
 
-            <div class="mobile-content" id="contenido-dinamico-movil">
-                </div>
+            <div class="mobile-content" id="contenido-dinamico-movil"></div>
 
-            <nav class="mobile-bottom-nav glass-effect" id="menu-movil">
-                </nav>
+            <nav class="mobile-bottom-nav glass-effect" id="menu-movil"></nav>
         </div>
 
     </div>
@@ -84,6 +83,7 @@
     
     <script src="Core.js"></script>
     <script src="Templates.js"></script>
+    
     <script src="Admin_Estudiantes.js"></script>
     <script src="Admin_Docentes.js"></script>
     <script src="Admin_Preceptores.js"></script>
