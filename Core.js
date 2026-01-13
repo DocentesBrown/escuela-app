@@ -85,19 +85,19 @@ function cargarDashboard(usuario) {
     
     if (rol === 'directivo') {
         // En directivos no solemos marcar uno como activo por defecto, o sí, depende tu gusto.
-        agregarBoton('🎓 Estudiantes', '🎓', 'verEstudiantes()'); 
-        agregarBoton('👨‍🏫 Docentes', '👨‍🏫', 'verDocentes()');
-        agregarBoton('📋 Preceptores', '📋', 'verPreceptores()');
+        agregarBoton('Estudiantes', '🎓', 'verEstudiantes()'); 
+        agregarBoton('Docentes', '👨‍🏫', 'verDocentes()');
+        agregarBoton('Preceptores', '📋', 'verPreceptores()');
     }
     
     if (rol === 'preceptor') {
-        agregarBoton('📝 Asistencia', '📝', 'iniciarModuloPreceptor()', 'active');
-        agregarBoton('📞 Docentes', '📞', 'verContactosDocentes()');
+        agregarBoton('Asistencia', '📝', 'iniciarModuloPreceptor()', 'active');
+        agregarBoton('Docentes', '📞', 'verContactosDocentes()');
     }
     
     if (rol === 'docente') {
-        agregarBoton('🏫 Cursos', '🏫', 'iniciarModuloDocente()', 'active');
-        agregarBoton('👤 Datos', '👤', 'verMisDatosDocente()');
+        agregarBoton('Cursos', '🏫', 'iniciarModuloDocente()', 'active');
+        agregarBoton('Datos', '👤', 'verMisDatosDocente()');
     }
 
     // Botón Salir (Siempre al final) - Versión Móvil
