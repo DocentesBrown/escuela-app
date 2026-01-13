@@ -91,7 +91,14 @@ function cargarDashboard(usuario) {
         agregarBoton('🏫 Cursos', '🏫', 'iniciarModuloDocente()', 'active');
         agregarBoton('👤 Datos', '👤', 'verMisDatosDocente()');
     }
-
+    
+    if (rol === 'estudiante') {
+        agregarBoton('📚 Mis Materias', '📚', 'iniciarModuloEstudiante()', 'active');
+        // Si quieres que vean sus datos personales, puedes reusar la función de ver datos si la adaptas, 
+        // o simplemente dejarles ver materias por ahora.
+        agregarBoton('👤 Mis Datos', '👤', 'alert("Próximamente")'); 
+    }
+    
     // Botón Salir (Siempre al final)
     menuMovil.innerHTML += `
         <button onclick="location.reload()" class="text-danger">
