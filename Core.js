@@ -2,7 +2,7 @@
 // ARCHIVO: Core.js
 // ============================================================================
 
-// --- TU URL DE GOOGLE APPS SCRIPT (CAMBIALA SI ES NECESARIO) ---
+// --- TU URL DE GOOGLE APPS SCRIPT ---
 const URL_API = "https://script.google.com/macros/s/AKfycbyTGnoS8hevr6k7pXE16p7KtcQxYrYP0yc11yJoJyvfX8Z7pEKJ5ZYymJ--IBcoVqUB/exec"; 
 
 // --- VARIABLES GLOBALES ---
@@ -53,7 +53,7 @@ function cargarDashboard(usuario) {
 
     const rol = usuario.rol.toLowerCase();
     const menuLateral = document.getElementById('menu-lateral');
-    const menuMovil = document.getElementById('navbar-mobile'); // NUEVO
+    const menuMovil = document.getElementById('navbar-mobile'); 
     
     menuLateral.innerHTML = '';
     menuMovil.innerHTML = ''; // Limpiar móvil
@@ -67,7 +67,6 @@ function cargarDashboard(usuario) {
             </button>`;
             
         // 2. Versión Móvil (Icono + Texto)
-        // Usamos emojis como iconos si no tienes FontAwesome, o cámbialos por <i class="bi bi-..."></i>
         menuMovil.innerHTML += `
             <button onclick="${onclick}" class="${claseColor ? 'text-primary' : ''}">
                 <span style="font-size:20px;">${icono}</span>
@@ -93,10 +92,12 @@ function cargarDashboard(usuario) {
     }
     
     if (rol === 'estudiante') {
+        // Opción 1: Ver Materias (Notas y Faltas)
         agregarBoton('📚 Mis Materias', '📚', 'iniciarModuloEstudiante()', 'active');
-        // Si quieres que vean sus datos personales, puedes reusar la función de ver datos si la adaptas, 
-        // o simplemente dejarles ver materias por ahora.
-        agregarBoton('👤 Mis Datos', '👤', 'alert("Próximamente")'); 
+        
+        // Opción 2: Ver Perfil (Datos Personales y Adulto)
+        // AHORA CONECTADO A LA NUEVA FUNCIÓN
+        agregarBoton('👤 Mis Datos', '👤', 'verMisDatosEstudiante()'); 
     }
     
     // Botón Salir (Siempre al final)
@@ -108,6 +109,7 @@ function cargarDashboard(usuario) {
         
     menuLateral.innerHTML += `<button class="list-group-item list-group-item-action text-danger mt-3" onclick="location.reload()">Cerrar Sesión</button>`;
 }
+
 function calcularEdad(fechaString) {
     if (!fechaString) return "-";
     const hoy = new Date();
