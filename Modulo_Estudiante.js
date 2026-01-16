@@ -1,5 +1,5 @@
 // ============================================================================
-// ARCHIVO: Modulo_Estudiante.js hola
+// ARCHIVO: Modulo_Estudiante.js
 // ============================================================================
 
 let datosEstudianteCache = []; // Para no volver a pedir datos al servidor al entrar/salir de detalles
@@ -10,7 +10,6 @@ async function iniciarModuloEstudiante() {
 
     try {
         // Solicitamos los datos al Backend usando el DNI del usuario logueado
-        // IMPORTANTE: Tu Google Apps Script debe manejar la operación "getDatosEstudiante"
         const resp = await fetch(`${URL_API}?op=getDatosEstudiante&rol=Estudiante&dni=${usuarioActual.dni}`);        
         const json = await resp.json();
 
@@ -187,6 +186,12 @@ async function verMisDatosEstudiante() {
                         </div>
                         <div class="card-body p-4">
                             
+                            <div class="alert alert-warning text-center shadow-sm mb-4">
+                                <h6 class="text-muted text-uppercase small fw-bold">Inasistencias Acumuladas</h6>
+                                <h1 class="display-4 fw-bold text-dark mb-0">${d.faltasInstitucionales || 0}</h1>
+                                <small class="text-muted">Registro de Preceptoría</small>
+                            </div>
+
                             <h5 class="text-primary border-bottom pb-2 mb-3">📄 Información Personal</h5>
                             <div class="row mb-2">
                                 <div class="col-4 text-muted fw-bold text-end">DNI:</div>
