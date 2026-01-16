@@ -34,6 +34,8 @@ async function iniciarModuloPreceptor() {
 async function cargarAsistencia(curso) {
     document.getElementById('contenido-dinamico').innerHTML = `<div class="spinner-border text-primary"></div> Cargando ${curso}...`;
     const fechaHoy = new Date().toISOString().split('T')[0];
+    
+    // AQUÍ SE INYECTA EL MODAL EN EL HTML
     document.getElementById('contenido-dinamico').innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h3>Curso: ${curso}</h3>
@@ -44,7 +46,8 @@ async function cargarAsistencia(curso) {
         </div>
         <input type="hidden" id="selCurso" value="${curso}">
         <div id="zonaPreceptor"><div class="spinner-border text-primary"></div> Obteniendo listado...</div>
-        ${renderModalJustificacionHTML()}
+        
+        ${renderModalJustificacionHTML()} 
     `;
     
     try {
@@ -57,18 +60,13 @@ async function cargarAsistencia(curso) {
 
 function renderTablaPreceptor() {
     const cursoSeleccionado = document.getElementById('selCurso').value;
-    
-    // Normalizamos el curso seleccionado (quitamos espacios extra)
     const cursoClean = String(cursoSeleccionado).trim().toUpperCase();
 
-    // Filtramos alumnos comparando texto limpio
-    // obj.data[2] es la columna CURSO que viene del Excel
     const lista = baseDatosAlumnos.filter(obj => {
         const cursoAlumno = String(obj.data[2] || "").trim().toUpperCase();
         return cursoAlumno === cursoClean;
     });
 
-    // Ordenamos alfabéticamente
     lista.sort((a,b) => String(a.data[1]).localeCompare(b.data[1]));
     
     if(lista.length === 0) {
@@ -92,7 +90,6 @@ function renderTablaPreceptor() {
         const alu = item.data; 
         const st = item.stats; 
         
-        // Formato de faltas
         let total = parseFloat(st.total);
         let totalStr = Number.isInteger(total) ? total : total.toFixed(2).replace('.00','');
         let alerta = total >= 10 ? `<span class="badge bg-danger ms-2">⚠️ ${totalStr}</span>` : (total > 0 ? `<span class="badge bg-light text-dark border ms-2">${totalStr}</span>` : "");
@@ -114,12 +111,11 @@ function renderTablaPreceptor() {
 async function guardarAsis() {
     const inputs = document.querySelectorAll('input[type="radio"]:checked');
     const fecha = document.getElementById('fechaAsistencia').value;
-    const curso = document.getElementById('selCurso').value; // <--- CAPTURAMOS EL CURSO
+    const curso = document.getElementById('selCurso').value;
 
     if (!fecha) return alert("Selecciona fecha.");
     
     let lista = [];
-    // Enviamos DNI y Estado (P, A, T)
     inputs.forEach(inp => lista.push({ dni: inp.name.split('_')[1], estado: inp.value }));
     
     try {
@@ -130,7 +126,7 @@ async function guardarAsis() {
                 lista: lista, 
                 preceptor: usuarioActual.nombre, 
                 fecha: fecha,
-                curso: curso // <--- LO ENVIAMOS AL BACKEND
+                curso: curso 
             })
         });
         alert(`¡Asistencia de ${curso} del ${fecha} guardada en Asistencia PR!`);
@@ -140,34 +136,59 @@ async function guardarAsis() {
 
 async function abrirModalJustificar(dni, nombre) {
     document.getElementById('just_nombre').innerText = nombre;
-    document.getElementById('just_lista').innerHTML = '<div class="spinner-border spinner-border-sm"></div> Buscando faltas...';
-    new bootstrap.Modal(document.getElementById('modalJustificar')).show();
+    const listaDiv = document.getElementById('just_lista');
+    
+    // Mostramos el modal usando Bootstrap
+    const modalEl = document.getElementById('modalJustificar');
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+    
+    listaDiv.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p>Buscando faltas...</p></div>';
+
     try {
         const resp = await fetch(`${URL_API}?op=getHistorialAlumno&rol=Preceptor&dni=${dni}`);
         const json = await resp.json();
-        let html = `<ul class="list-group">`;
-        if(json.data.length === 0) html = '<div class="alert alert-success">Sin faltas injustificadas.</div>';
-        else {
+        
+        if(json.data.length === 0) {
+            listaDiv.innerHTML = '<div class="alert alert-success m-3">Sin faltas para justificar.</div>';
+        } else {
+            let html = `<ul class="list-group list-group-flush">`;
             json.data.forEach(item => {
                 let badge = item.estado === 'A' ? '<span class="badge bg-danger">Ausente</span>' : (item.estado === 'T' ? '<span class="badge bg-warning text-dark">Tarde</span>' : '<span class="badge bg-secondary">EF</span>');
-                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div><strong>${item.fecha}</strong> ${badge}</div>
-                    <button class="btn btn-sm btn-outline-success" onclick="confirmarJustificacion(${item.fila}, '${dni}')">Justificar ✅</button>
+                
+                html += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${item.fecha}</strong> ${badge}
+                    </div>
+                    <button class="btn btn-sm btn-outline-success fw-bold" onclick="confirmarJustificacion(${item.fila}, '${dni}')">
+                        Justificar ✅
+                    </button>
                 </li>`;
             });
             html += `</ul>`;
+            listaDiv.innerHTML = html;
         }
-        document.getElementById('just_lista').innerHTML = html;
-    } catch(e) { document.getElementById('just_lista').innerHTML = "Error."; }
+    } catch(e) { 
+        console.error(e);
+        listaDiv.innerHTML = '<div class="alert alert-danger m-3">Error al cargar historial.</div>'; 
+    }
 }
 
 async function confirmarJustificacion(fila, dni) {
-    if(!confirm("¿Confirmar justificación?")) return;
+    if(!confirm("¿Confirmar justificación para esta fecha?")) return;
     try {
         await fetch(URL_API, { method: 'POST', body: JSON.stringify({ op: 'justificarFalta', fila: fila })});
-        alert("Justificada.");
-        bootstrap.Modal.getInstance(document.getElementById('modalJustificar')).hide();
-    } catch(e) { alert("Error."); }
+        alert("Falta justificada correctamente.");
+        
+        // Ocultar modal y recargar tabla
+        const modalEl = document.getElementById('modalJustificar');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if(modal) modal.hide();
+        
+        renderTablaPreceptor(); // Recargar para ver los cambios en los contadores
+        
+    } catch(e) { alert("Error al procesar."); }
 }
 
 async function verContactosDocentes() {
