@@ -135,22 +135,42 @@ async function guardarAsis() {
 }
 
 async function abrirModalJustificar(dni, nombre) {
-    document.getElementById('just_nombre').innerText = nombre;
-    const listaDiv = document.getElementById('just_lista');
+    // 1. Verificar si el modal existe en el HTML, si no, lo creamos a la fuerza
+    let modalEl = document.getElementById('modalJustificar');
     
-    // Mostramos el modal usando Bootstrap
-    const modalEl = document.getElementById('modalJustificar');
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-    
-    listaDiv.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p>Buscando faltas...</p></div>';
+    if (!modalEl) {
+        console.log("El modal no existía, inyectándolo...");
+        const divFantasma = document.createElement('div');
+        divFantasma.innerHTML = renderModalJustificacionHTML(); // Usamos la función del Template
+        document.body.appendChild(divFantasma.firstElementChild);
+        modalEl = document.getElementById('modalJustificar');
+    }
 
+    // 2. Llenar datos iniciales
+    const spanNombre = document.getElementById('just_nombre');
+    if (spanNombre) spanNombre.innerText = nombre;
+    
+    const listaDiv = document.getElementById('just_lista');
+    if (listaDiv) listaDiv.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div><p>Buscando faltas...</p></div>';
+
+    // 3. Mostrar Modal (Bootstrap)
+    try {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    } catch (err) {
+        alert("Error al abrir modal: Revisa que Bootstrap esté cargado en index.html");
+        return;
+    }
+
+    // 4. Fetch de datos
     try {
         const resp = await fetch(`${URL_API}?op=getHistorialAlumno&rol=Preceptor&dni=${dni}`);
         const json = await resp.json();
         
+        if (!listaDiv) return;
+
         if(json.data.length === 0) {
-            listaDiv.innerHTML = '<div class="alert alert-success m-3">Sin faltas para justificar.</div>';
+            listaDiv.innerHTML = '<div class="alert alert-success m-3">Sin faltas injustificadas en Asistencia PR.</div>';
         } else {
             let html = `<ul class="list-group list-group-flush">`;
             json.data.forEach(item => {
@@ -171,7 +191,7 @@ async function abrirModalJustificar(dni, nombre) {
         }
     } catch(e) { 
         console.error(e);
-        listaDiv.innerHTML = '<div class="alert alert-danger m-3">Error al cargar historial.</div>'; 
+        if (listaDiv) listaDiv.innerHTML = '<div class="alert alert-danger m-3">Error al cargar historial.</div>'; 
     }
 }
 
