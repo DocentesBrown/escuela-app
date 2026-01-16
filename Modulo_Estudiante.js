@@ -163,3 +163,61 @@ function verDetalleMateria(id) {
         </div>
     `;
 }
+
+async function verMisDatosEstudiante() {
+    const contenedor = document.getElementById('contenido-dinamico');
+    contenedor.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Cargando perfil...</p></div>';
+
+    try {
+        const resp = await fetch(`${URL_API}?op=getPerfilEstudiante&rol=Estudiante&dni=${usuarioActual.dni}`);
+        const json = await resp.json();
+
+        if (json.status !== 'success') throw new Error(json.message);
+
+        const d = json.data;
+
+        contenedor.innerHTML = `
+            <div class="row justify-content-center">
+                <div class="col-md-8 col-lg-6">
+                    <div class="card shadow border-0">
+                        <div class="card-header bg-primary text-white text-center py-4">
+                            <div class="display-1 mb-2">👤</div>
+                            <h3 class="mb-0">${d.nombre}</h3>
+                            <span class="badge bg-white text-primary mt-2 fs-6">${d.curso}</span>
+                        </div>
+                        <div class="card-body p-4">
+                            
+                            <h5 class="text-primary border-bottom pb-2 mb-3">📄 Información Personal</h5>
+                            <div class="row mb-2">
+                                <div class="col-4 text-muted fw-bold text-end">DNI:</div>
+                                <div class="col-8 fw-bold">${d.dni}</div>
+                            </div>
+                            <div class="row mb-4">
+                                <div class="col-4 text-muted fw-bold text-end">Nacimiento:</div>
+                                <div class="col-8">${d.nacimiento || '-'}</div>
+                            </div>
+
+                            <h5 class="text-primary border-bottom pb-2 mb-3">👨‍👩‍👦 Responsable a Cargo</h5>
+                            <div class="row mb-2">
+                                <div class="col-4 text-muted fw-bold text-end">Nombre:</div>
+                                <div class="col-8">${d.adultoNombre || '-'}</div>
+                            </div>
+                            <div class="row mb-2">
+                                <div class="col-4 text-muted fw-bold text-end">Email:</div>
+                                <div class="col-8"><a href="mailto:${d.adultoEmail}">${d.adultoEmail || '-'}</a></div>
+                            </div>
+                            <div class="row mb-2">
+                                <div class="col-4 text-muted fw-bold text-end">Celular:</div>
+                                <div class="col-8">${d.adultoCelular || '-'}</div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+    } catch (e) {
+        contenedor.innerHTML = `<div class="alert alert-danger">Error al cargar perfil: ${e.message}</div>`;
+    }
+}
