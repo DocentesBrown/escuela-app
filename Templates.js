@@ -190,18 +190,26 @@ function renderModalCursosPreceptorHTML() {
     </div>`;
 }
 
+// === AQUÍ ESTABA EL ERROR: VERSIÓN CORREGIDA PARA PRECEPTORES ===
 function renderModalJustificacionHTML() {
     return `
     <div class="modal fade" id="modalJustificar" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
-          <div class="modal-header bg-primary text-white">
-            <h5 class="modal-title">Justificar Inasistencias</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          <div class="modal-header bg-warning">
+            <h5 class="modal-title text-dark">Justificar Inasistencias (PR)</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <h6 class="mb-3 text-center" id="just_nombre">Alumno</h6>
-            <div id="just_lista" style="max-height: 300px; overflow-y: auto;"></div>
+            <h6 class="mb-3 text-center">Estudiante: <b id="just_nombre"></b></h6>
+            
+            <div class="alert alert-info py-2 small">
+                <i class="bi bi-info-circle"></i> Faltas de "Asistencia PR" no justificadas.
+            </div>
+
+            <div id="just_lista" style="max-height: 300px; overflow-y: auto;">
+                <div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div> Buscando...</div>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -224,8 +232,7 @@ function renderModalJustificarDocenteHTML() {
             <p>Alumno: <b id="just_doc_nombre"></b></p>
             <p class="small text-muted">Selecciona la fecha para justificar la falta.</p>
             <div id="lista_faltas_docente" class="list-group">
-                <!-- Las faltas se cargarán aquí dinámicamente -->
-            </div>
+                </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
