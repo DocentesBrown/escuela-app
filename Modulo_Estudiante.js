@@ -2,20 +2,31 @@
 // ARCHIVO: Modulo_Estudiante.js
 // ============================================================================
 
-let datosEstudianteCache = []; // Para no volver a pedir datos al servidor al entrar/salir de detalles
+let datosEstudianteCache = []; 
+let faltasTotalesCache = 0; // Variable para guardar las faltas
 
 async function iniciarModuloEstudiante() {
     const contenedor = document.getElementById('contenido-dinamico');
-    contenedor.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Cargando tus materias...</p></div>';
+    contenedor.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Cargando información académica...</p></div>';
 
     try {
-        // Solicitamos los datos al Backend usando el DNI del usuario logueado
-        const resp = await fetch(`${URL_API}?op=getDatosEstudiante&rol=Estudiante&dni=${usuarioActual.dni}`);        
-        const json = await resp.json();
+        // 1. Pedimos las MATERIAS
+        const respMaterias = await fetch(`${URL_API}?op=getDatosEstudiante&rol=Estudiante&dni=${usuarioActual.dni}`);        
+        const jsonMaterias = await respMaterias.json();
 
-        if (json.status !== 'success') throw new Error(json.message);
+        // 2. Pedimos el PERFIL (para sacar el total de faltas institucionales)
+        const respPerfil = await fetch(`${URL_API}?op=getPerfilEstudiante&rol=Estudiante&dni=${usuarioActual.dni}`);
+        const jsonPerfil = await respPerfil.json();
 
-        datosEstudianteCache = json.data; // Guardamos en memoria
+        if (jsonMaterias.status !== 'success') throw new Error(jsonMaterias.message);
+
+        datosEstudianteCache = jsonMaterias.data; 
+        
+        // Guardamos las faltas si existen, sino 0
+        if (jsonPerfil.status === 'success') {
+            faltasTotalesCache = jsonPerfil.data.faltasInstitucionales || 0;
+        }
+
         renderizarGridMaterias(datosEstudianteCache);
 
     } catch (e) {
@@ -27,14 +38,24 @@ async function iniciarModuloEstudiante() {
 function renderizarGridMaterias(materias) {
     const contenedor = document.getElementById('contenido-dinamico');
     
+    // --- BLOQUE DE FALTAS (Color Cremita) ---
+    // Lo ponemos al principio
+    let htmlFaltas = `
+        <div class="alert alert-warning text-center shadow-sm mb-4 border-warning">
+            <h6 class="text-muted text-uppercase small fw-bold mb-1">Inasistencias Institucionales</h6>
+            <h1 class="display-4 fw-bold text-dark mb-0">${faltasTotalesCache}</h1>
+            <small class="text-muted">Registro de Preceptoría</small>
+        </div>
+    `;
+
     if (!materias || materias.length === 0) {
-        contenedor.innerHTML = `
+        contenedor.innerHTML = htmlFaltas + `
             <h4 class="mb-4">📚 Mis Materias</h4>
             <div class="alert alert-info">No tienes materias asignadas todavía.</div>`;
         return;
     }
 
-    let html = `
+    let html = htmlFaltas + `
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4>📚 Mis Materias</h4>
         <span class="badge bg-primary rounded-pill">${materias.length} Asignaturas</span>
@@ -42,14 +63,12 @@ function renderizarGridMaterias(materias) {
     <div class="row g-3">`;
 
     materias.forEach(mat => {
-        // Lógica de colores según el Estado
         let badgeColor = 'bg-secondary';
         let textoEstado = mat.estado || 'Regular';
 
-        // Detectamos palabras clave para colorear
-        if (textoEstado.toLowerCase().includes('recursa')) badgeColor = 'bg-danger';      // Rojo para recursantes
-        else if (textoEstado.toLowerCase().includes('intensifica')) badgeColor = 'bg-warning text-dark'; // Amarillo para intensificación
-        else if (textoEstado.toLowerCase().includes('cursa')) badgeColor = 'bg-success';  // Verde para cursada normal
+        if (textoEstado.toLowerCase().includes('recursa')) badgeColor = 'bg-danger';      
+        else if (textoEstado.toLowerCase().includes('intensifica')) badgeColor = 'bg-warning text-dark'; 
+        else if (textoEstado.toLowerCase().includes('cursa')) badgeColor = 'bg-success';  
 
         html += `
         <div class="col-md-4 col-sm-6">
@@ -73,7 +92,7 @@ function renderizarGridMaterias(materias) {
                             <span class="fw-bold ${mat.promedio && mat.promedio >= 7 ? 'text-success' : 'text-dark'}">${mat.promedio || '-'}</span>
                         </div>
                         <div class="text-center border-start ps-3">
-                            <small class="d-block text-muted" style="font-size:0.75rem">Faltas</small>
+                            <small class="d-block text-muted" style="font-size:0.75rem">Faltas Mat.</small>
                             <span class="fw-bold ${mat.faltas > 10 ? 'text-danger' : 'text-dark'}">${mat.faltas || 0}</span>
                         </div>
                     </div>
@@ -92,14 +111,11 @@ function verDetalleMateria(id) {
 
     const contenedor = document.getElementById('contenido-dinamico');
     
-    // GENERAR LISTA DE NOTAS (RENGLÓN POR RENGLÓN)
     let htmlNotas = '';
     
     if (materia.notas && materia.notas.length > 0) {
         htmlNotas = `<ul class="list-group list-group-flush shadow-sm rounded mb-3">`;
-        
         materia.notas.forEach(n => {
-            // Color para aprobados/desaprobados visual
             let colorNota = 'text-dark';
             let valorNum = parseFloat(n.valor);
             if (!isNaN(valorNum)) {
@@ -107,15 +123,12 @@ function verDetalleMateria(id) {
                 else if (valorNum >= 4) colorNota = 'text-warning fw-bold';
                 else colorNota = 'text-danger fw-bold';
             }
-            
-            // Cada nota es un Item de lista (un renglón)
             htmlNotas += `
                 <li class="list-group-item d-flex justify-content-between align-items-center py-3">
                     <span class="text-muted">${n.instancia}</span>
                     <span class="fs-5 ${colorNota}">${n.valor}</span>
                 </li>`;
         });
-        
         htmlNotas += `</ul>`;
     } else {
         htmlNotas = `
@@ -124,7 +137,6 @@ function verDetalleMateria(id) {
             </div>`;
     }
 
-    // Renderizar Vista Detalle
     contenedor.innerHTML = `
         <button class="btn btn-outline-secondary mb-3" onclick="renderizarGridMaterias(datosEstudianteCache)">
             ⬅ Volver
@@ -142,19 +154,12 @@ function verDetalleMateria(id) {
                         <h5 class="border-bottom pb-2 mb-3 text-primary">📊 Calificaciones</h5>
                         ${htmlNotas}
                     </div>
-
                     <div class="col-md-5">
                         <div class="card bg-light border-0 mb-3">
                             <div class="card-body">
                                 <h6 class="text-muted text-uppercase small fw-bold">Docente a cargo</h6>
                                 <p class="fs-5 fw-bold mb-0 text-dark">👨‍🏫 ${materia.profesor || 'Sin asignar'}</p>
                             </div>
-                        </div>
-
-                        <h5 class="border-bottom pb-2 mb-3 text-primary mt-4">📅 Asistencia</h5>
-                        <div class="card border-danger border-2 text-center py-3">
-                            <h1 class="display-3 fw-bold text-danger mb-0">${materia.faltas || 0}</h1>
-                            <p class="text-muted text-uppercase fw-bold small mb-0">Inasistencias</p>
                         </div>
                     </div>
                 </div>
@@ -172,9 +177,9 @@ async function verMisDatosEstudiante() {
         const json = await resp.json();
 
         if (json.status !== 'success') throw new Error(json.message);
-
         const d = json.data;
 
+        // --- YA NO MOSTRAMOS LAS FALTAS AQUÍ ---
         contenedor.innerHTML = `
             <div class="row justify-content-center">
                 <div class="col-md-8 col-lg-6">
@@ -185,13 +190,6 @@ async function verMisDatosEstudiante() {
                             <span class="badge bg-white text-primary mt-2 fs-6">${d.curso}</span>
                         </div>
                         <div class="card-body p-4">
-                            
-                            <div class="alert alert-warning text-center shadow-sm mb-4">
-                                <h6 class="text-muted text-uppercase small fw-bold">Inasistencias Acumuladas</h6>
-                                <h1 class="display-4 fw-bold text-dark mb-0">${d.faltasInstitucionales || 0}</h1>
-                                <small class="text-muted">Registro de Preceptoría</small>
-                            </div>
-
                             <h5 class="text-primary border-bottom pb-2 mb-3">📄 Información Personal</h5>
                             <div class="row mb-2">
                                 <div class="col-4 text-muted fw-bold text-end">DNI:</div>
@@ -215,7 +213,6 @@ async function verMisDatosEstudiante() {
                                 <div class="col-4 text-muted fw-bold text-end">Celular:</div>
                                 <div class="col-8">${d.adultoCelular || '-'}</div>
                             </div>
-
                         </div>
                     </div>
                 </div>
