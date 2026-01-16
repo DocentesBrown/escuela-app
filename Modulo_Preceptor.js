@@ -114,12 +114,26 @@ function renderTablaPreceptor() {
 async function guardarAsis() {
     const inputs = document.querySelectorAll('input[type="radio"]:checked');
     const fecha = document.getElementById('fechaAsistencia').value;
+    const curso = document.getElementById('selCurso').value; // <--- CAPTURAMOS EL CURSO
+
     if (!fecha) return alert("Selecciona fecha.");
+    
     let lista = [];
+    // Enviamos DNI y Estado (P, A, T)
     inputs.forEach(inp => lista.push({ dni: inp.name.split('_')[1], estado: inp.value }));
+    
     try {
-        await fetch(URL_API, { method: 'POST', body: JSON.stringify({ op: 'guardarAsistenciaMasiva', lista: lista, preceptor: usuarioActual.nombre, fecha: fecha })});
-        alert(`¡Asistencia del ${fecha} guardada!`);
+        await fetch(URL_API, { 
+            method: 'POST', 
+            body: JSON.stringify({ 
+                op: 'guardarAsistenciaMasiva', 
+                lista: lista, 
+                preceptor: usuarioActual.nombre, 
+                fecha: fecha,
+                curso: curso // <--- LO ENVIAMOS AL BACKEND
+            })
+        });
+        alert(`¡Asistencia de ${curso} del ${fecha} guardada en Asistencia PR!`);
         iniciarModuloPreceptor();
     } catch(e) { alert("Error al guardar."); }
 }
